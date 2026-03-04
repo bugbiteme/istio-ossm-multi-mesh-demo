@@ -17,6 +17,8 @@ spec:
       discoverySelectors:
         - matchLabels:
             istio-injection: enabled
+        - matchLabels:
+            kubernetes.io/metadata.name: istio-system
       defaultServiceExportTo: ["."]
       defaultVirtualServiceExportTo: ["."]
       defaultDestinationRuleExportTo: ["."]

@@ -195,31 +195,72 @@ oc --context="${CTX_WEST}" wait --for=condition=Ready istio/default \
   -n istio-system --timeout=300s
 ```
 
+Then verify istiod has successfully initialized its CA and propagated the root cert configmap to `istio-system`. Gateway pods will fail to start if this configmap is absent, because the injected sidecar mounts it as a volume:
+
+```bash
+oc --context="${CTX_EAST}" get configmap istio-ca-root-cert -n istio-system
+oc --context="${CTX_WEST}" get configmap istio-ca-root-cert -n istio-system
+```
+
+Both must exist before continuing. If either is missing, check that the `cacerts` secret was correctly created in step 1.4 and that istiod has no errors:
+
+```bash
+oc --context="${CTX_EAST}" logs -n istio-system \
+  -l app=istiod --tail=50 | grep -i "error\|ca\|cert"
+oc --context="${CTX_WEST}" logs -n istio-system \
+  -l app=istiod --tail=50 | grep -i "error\|ca\|cert"
+```
+
 ### 2.3 Deploy east-west gateways
 
-East-west gateways operate in `sni-dnat` mode, routing cross-cluster traffic based on SNI without terminating mTLS. See [`manifests/ossm/east/eastwest-gateway.yaml`](manifests/ossm/east/eastwest-gateway.yaml) and [`manifests/ossm/west/eastwest-gateway.yaml`](manifests/ossm/west/eastwest-gateway.yaml):
+East-west gateways operate in `sni-dnat` mode, routing cross-cluster traffic based on SNI without terminating mTLS. The manifests are raw Kubernetes resources (ServiceAccount, Deployment, Service, etc.) templated with `envsubst`. See [`manifests/ossm/east/eastwest-gateway.yaml`](manifests/ossm/east/eastwest-gateway.yaml) and [`manifests/ossm/west/eastwest-gateway.yaml`](manifests/ossm/west/eastwest-gateway.yaml).
+
+First, label the `istio-system` namespace on each cluster with its network identity. The gateway pod reads this label at startup via the downward API to set `ISTIO_META_NETWORK`, which istiod uses for cross-network endpoint routing.
+
+> **Important:** Every application namespace must also receive this label (see Parts 3.1 and 3.2). Istiod tags each workload endpoint with the network of its namespace. The east-west gateway filters its xDS view using `ISTIO_META_REQUESTED_NETWORK_VIEW` — if a namespace is not labeled, its endpoints are invisible to the remote gateway and cross-cluster traffic will fail with a connection reset.
+
+```bash
+oc --context="${CTX_EAST}" label namespace istio-system \
+  topology.istio.io/network="${EAST_NETWORK}" --overwrite
+
+oc --context="${CTX_WEST}" label namespace istio-system \
+  topology.istio.io/network="${WEST_NETWORK}" --overwrite
+```
+
+Then apply the gateway manifests:
 
 ```bash
 envsubst < manifests/ossm/east/eastwest-gateway.yaml | \
-  istioctl --context="${CTX_EAST}" install -y -f -
+  oc --context="${CTX_EAST}" apply -f -
 
 envsubst < manifests/ossm/west/eastwest-gateway.yaml | \
-  istioctl --context="${CTX_WEST}" install -y -f -
+  oc --context="${CTX_WEST}" apply -f -
 ```
 
-Collect the external gateway addresses:
+Wait for the gateway pods to be ready:
+
+```bash
+oc --context="${CTX_EAST}" rollout status deployment istio-eastwestgateway \
+  -n istio-system --timeout=120s
+oc --context="${CTX_WEST}" rollout status deployment istio-eastwestgateway \
+  -n istio-system --timeout=120s
+```
+
+Collect the external gateway addresses. Cloud providers (AWS, GCP) assign a hostname rather than an IP — the helper below returns whichever is set:
 
 ```bash
 export EAST_GW_ADDR=$(oc --context="${CTX_EAST}" get svc istio-eastwestgateway \
-  -n istio-system -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+  -n istio-system \
+  -o jsonpath='{.status.loadBalancer.ingress[0].ip}{.status.loadBalancer.ingress[0].hostname}')
 export WEST_GW_ADDR=$(oc --context="${CTX_WEST}" get svc istio-eastwestgateway \
-  -n istio-system -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+  -n istio-system \
+  -o jsonpath='{.status.loadBalancer.ingress[0].ip}{.status.loadBalancer.ingress[0].hostname}')
 
 echo "East gateway: ${EAST_GW_ADDR}"
 echo "West gateway: ${WEST_GW_ADDR}"
 ```
 
-Both must be non-empty before continuing.
+Both must be non-empty before continuing. If either is empty, the `LoadBalancer` service has not yet been assigned an external address — wait a moment and retry. On bare-metal clusters without a cloud load balancer, see the on-prem note in the Prerequisites section.
 
 ### 2.4 Expose services through the east-west gateways
 
@@ -257,6 +298,15 @@ istioctl --context="${CTX_WEST}" remote-clusters
 
 Both should show the remote cluster with status `synced`.
 
+```bash
+NAME             SECRET                                            STATUS     ISTIOD
+cluster-east                                                       synced     istiod-7d96c484ff-m2tks
+cluster-west     istio-system/istio-remote-secret-cluster-west     synced     istiod-7d96c484ff-m2tks
+NAME             SECRET                                            STATUS     ISTIOD
+cluster-west                                                       synced     istiod-7bdf94b47c-tt5wd
+cluster-east     istio-system/istio-remote-secret-cluster-east     synced     istiod-7bdf94b47c-tt5wd
+```
+
 > **Script:** `bash scripts/02-install-ossm.sh` runs all of Part 2.
 
 ---
@@ -272,6 +322,8 @@ for NS in travel-agency travel-portal travel-control; do
   oc --context="${CTX_EAST}" create namespace "${NS}" --dry-run=client -o yaml | \
     oc --context="${CTX_EAST}" apply -f -
   oc --context="${CTX_EAST}" label namespace "${NS}" istio-injection=enabled --overwrite
+  oc --context="${CTX_EAST}" label namespace "${NS}" \
+    topology.istio.io/network="${EAST_NETWORK}" --overwrite
 done
 
 oc --context="${CTX_EAST}" apply \
@@ -306,6 +358,8 @@ West runs only `hotels`, `insurances`, and their local dependencies (`discounts`
 oc --context="${CTX_WEST}" create namespace travel-agency --dry-run=client -o yaml | \
   oc --context="${CTX_WEST}" apply -f -
 oc --context="${CTX_WEST}" label namespace travel-agency istio-injection=enabled --overwrite
+oc --context="${CTX_WEST}" label namespace travel-agency \
+  topology.istio.io/network="${WEST_NETWORK}" --overwrite
 
 oc --context="${CTX_WEST}" apply \
   -f manifests/apps/west/travel-agency-west.yaml \
@@ -328,7 +382,9 @@ oc --context="${CTX_EAST}" apply -f manifests/federation/east/east-federation.ya
 
 ### 4.2 Service visibility and DestinationRules on West
 
-`hotels` and `insurances` are exported (`exportTo: ["*"]`). `discounts` stays private. Apply [`manifests/federation/west/west-federation.yaml`](manifests/federation/west/west-federation.yaml) and annotate the services:
+`hotels` and `insurances` are exported (`exportTo: ["*"]`). `discounts` stays private. Apply [`manifests/federation/west/west-federation.yaml`](manifests/federation/west/west-federation.yaml) and annotate the services.
+
+> **Required for the east-west gateway:** The control planes use `defaultServiceExportTo: ["."]` (private by default). Any service that must be reachable via the EW gateway needs `networking.istio.io/exportTo: "*"`. Without this annotation, istiod does not push xDS config for the service to the `istio-system` gateway pod, and no SNI-DNAT listener is created on port 15443.
 
 ```bash
 oc --context="${CTX_WEST}" apply -f manifests/federation/west/west-federation.yaml
