@@ -8,6 +8,8 @@ REPO_ROOT="$(dirname "${SCRIPT_DIR}")"
 
 echo "==> Installing Istio CNI on both clusters..."
 for CTX in "${CTX_EAST}" "${CTX_WEST}"; do
+  oc --context="${CTX}" create namespace istio-cni --dry-run=client -o yaml | \
+    oc --context="${CTX}" apply -f -
   envsubst < "${REPO_ROOT}/manifests/ossm/istio-cni.yaml" | oc --context="${CTX}" apply -f -
 done
 

@@ -160,6 +160,8 @@ The CNI plugin must exist before istiod is installed. Apply [`manifests/ossm/ist
 
 ```bash
 for CTX in "${CTX_EAST}" "${CTX_WEST}"; do
+  oc --context="${CTX}" create namespace istio-cni --dry-run=client -o yaml | \
+    oc --context="${CTX}" apply -f -
   envsubst < manifests/ossm/istio-cni.yaml | oc --context="${CTX}" apply -f -
 done
 

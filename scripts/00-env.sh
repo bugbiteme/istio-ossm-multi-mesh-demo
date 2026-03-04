@@ -2,8 +2,8 @@
 # Source this file before running any other scripts:
 #   source scripts/00-env.sh
 
-export CTX_EAST="<your-east-kubeconfig-context>"
-export CTX_WEST="<your-west-kubeconfig-context>"
+export CTX_EAST="admin-east"
+export CTX_WEST="admin-west"
 
 export ISTIO_VERSION="1.27.5"
 export MESH_ID="mesh1"

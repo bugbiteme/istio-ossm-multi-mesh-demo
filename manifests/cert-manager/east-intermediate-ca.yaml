@@ -9,6 +9,8 @@ spec:
   renewBefore: 720h
   isCA: true
   commonName: east-intermediate-ca
+  privateKey:
+    rotationPolicy: Never
   subject:
     organizations: ["MyOrg"]
   issuerRef:

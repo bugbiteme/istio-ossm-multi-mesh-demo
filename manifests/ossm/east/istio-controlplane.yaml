@@ -1,6 +1,6 @@
 # East cluster Istio control plane.
 # Requires env vars: ISTIO_VERSION, MESH_ID, EAST_CLUSTER, EAST_NETWORK (use envsubst).
-apiVersion: sailoperator.io/v1alpha1
+apiVersion: sailoperator.io/v1
 kind: Istio
 metadata:
   name: default

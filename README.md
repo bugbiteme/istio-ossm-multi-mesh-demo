@@ -236,7 +236,7 @@ The CNI plugin must exist before istiod is installed. On **both** clusters:
 ```bash
 for CTX in "${CTX_EAST}" "${CTX_WEST}"; do
   cat <<EOF | oc --context="${CTX}" apply -f -
-apiVersion: sailoperator.io/v1alpha1
+apiVersion: sailoperator.io/v1
 kind: IstioCNI
 metadata:
   name: default
@@ -263,7 +263,7 @@ Each cluster gets its own `Istio` resource (the OSSM 3 replacement for `ServiceM
 ```bash
 # East control plane
 cat <<EOF | oc --context="${CTX_EAST}" apply -f -
-apiVersion: sailoperator.io/v1alpha1
+apiVersion: sailoperator.io/v1
 kind: Istio
 metadata:
   name: default
@@ -288,7 +288,7 @@ EOF
 
 # West control plane
 cat <<EOF | oc --context="${CTX_WEST}" apply -f -
-apiVersion: sailoperator.io/v1alpha1
+apiVersion: sailoperator.io/v1
 kind: Istio
 metadata:
   name: default
