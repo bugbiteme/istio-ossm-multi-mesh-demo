@@ -1,0 +1,22 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: cacerts
+  namespace: istio-system
+spec:
+  secretName: cacerts
+  duration: 8760h
+  renewBefore: 720h
+  isCA: true
+  commonName: east-intermediate-ca
+  subject:
+    organizations: ["MyOrg"]
+  issuerRef:
+    name: istio-root-ca
+    kind: ClusterIssuer
+    group: cert-manager.io
+  usages:
+    - cert sign
+    - crl sign
+    - digital signature
+    - key encipherment

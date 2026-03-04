@@ -1,0 +1,12 @@
+# East federation config — all travel-agency services are private (no cross-cluster export).
+apiVersion: networking.istio.io/v1
+kind: DestinationRule
+metadata:
+  name: travel-agency-local
+  namespace: travel-agency
+spec:
+  exportTo: ["."]
+  host: "*.travel-agency.svc.cluster.local"
+  trafficPolicy:
+    tls:
+      mode: ISTIO_MUTUAL

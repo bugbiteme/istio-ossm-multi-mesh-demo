@@ -1,0 +1,34 @@
+# West AuthorizationPolicies — only the 'travels' service account on East may call
+# hotels and insurances across clusters.
+---
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: hotels-allow-travels
+  namespace: travel-agency
+spec:
+  selector:
+    matchLabels:
+      app: hotels
+  action: ALLOW
+  rules:
+    - from:
+        - source:
+            principals:
+              - "cluster.local/ns/travel-agency/sa/travels"
+---
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: insurances-allow-travels
+  namespace: travel-agency
+spec:
+  selector:
+    matchLabels:
+      app: insurances
+  action: ALLOW
+  rules:
+    - from:
+        - source:
+            principals:
+              - "cluster.local/ns/travel-agency/sa/travels"

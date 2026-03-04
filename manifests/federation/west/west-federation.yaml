@@ -1,0 +1,45 @@
+# West federation config — hotels and insurances exported; discounts stays private.
+---
+apiVersion: networking.istio.io/v1
+kind: DestinationRule
+metadata:
+  name: discounts-private
+  namespace: travel-agency
+spec:
+  exportTo: ["."]
+  host: discounts.travel-agency.svc.cluster.local
+  trafficPolicy:
+    tls:
+      mode: ISTIO_MUTUAL
+---
+apiVersion: networking.istio.io/v1
+kind: DestinationRule
+metadata:
+  name: hotels-federated
+  namespace: travel-agency
+spec:
+  exportTo: ["*"]
+  host: hotels.travel-agency.svc.cluster.local
+  trafficPolicy:
+    tls:
+      mode: ISTIO_MUTUAL
+    outlierDetection:
+      consecutive5xxErrors: 3
+      interval: 10s
+      baseEjectionTime: 30s
+---
+apiVersion: networking.istio.io/v1
+kind: DestinationRule
+metadata:
+  name: insurances-federated
+  namespace: travel-agency
+spec:
+  exportTo: ["*"]
+  host: insurances.travel-agency.svc.cluster.local
+  trafficPolicy:
+    tls:
+      mode: ISTIO_MUTUAL
+    outlierDetection:
+      consecutive5xxErrors: 3
+      interval: 10s
+      baseEjectionTime: 30s
