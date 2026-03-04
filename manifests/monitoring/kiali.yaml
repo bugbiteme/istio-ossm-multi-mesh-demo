@@ -1,0 +1,52 @@
+# Kiali instance for OSSM 3.x / Sail Operator.
+# Requires: Kiali Operator installed from OperatorHub.
+# Requires: user workload monitoring enabled (user-workload-monitoring.yaml).
+# Apply per-cluster — each cluster gets its own Kiali instance:
+#   oc --context="${CTX_EAST}" apply -n istio-system -f manifests/monitoring/kiali.yaml
+#   oc --context="${CTX_WEST}" apply -n istio-system -f manifests/monitoring/kiali.yaml
+#
+# Prometheus URL: the OpenShift user workload monitoring Prometheus.
+# The thanos-querier aggregates both platform and user workload metrics.
+apiVersion: kiali.io/v1alpha1
+kind: Kiali
+metadata:
+  name: kiali
+  namespace: istio-system
+spec:
+  istio_namespace: istio-system
+
+  auth:
+    strategy: openshift   # integrates with OpenShift OAuth; use "anonymous" for quick testing
+
+  deployment:
+    # Accessible namespaces drives the namespace list in the UI.
+    # "**" means all namespaces the Kiali SA can see.
+    # Restrict to specific namespaces in production.
+    accessible_namespaces:
+      - "**"
+    ingress:
+      enabled: true
+
+  external_services:
+    prometheus:
+      # thanos-querier in openshift-monitoring aggregates user workload metrics.
+      url: "https://thanos-querier.openshift-monitoring.svc.cluster.local:9091"
+      auth:
+        type: bearer
+        use_kiali_token: true
+      tls_config:
+        insecure_skip_verify: true
+
+    istio:
+      root_namespace: istio-system
+      # Sail Operator uses the 'default' Istio CR name.
+      config_map_name: istio
+      istio_sidecar_injector_config_map_name: istio-sidecar-injector
+      istiod_deployment_name: istiod
+      pilot_service: istiod
+
+    grafana:
+      enabled: false   # set to true and add url if you deploy Grafana
+
+    tracing:
+      enabled: false   # set to true and add url if you deploy Jaeger/Tempo

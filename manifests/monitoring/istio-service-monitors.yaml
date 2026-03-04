@@ -1,0 +1,65 @@
+# Prometheus scrape config for Istio components.
+# Apply to BOTH clusters in the istio-system namespace:
+#   oc --context="${CTX_EAST}" apply -n istio-system -f manifests/monitoring/istio-service-monitors.yaml
+#   oc --context="${CTX_WEST}" apply -n istio-system -f manifests/monitoring/istio-service-monitors.yaml
+---
+# PodMonitor for Envoy sidecar metrics.
+# Scrapes port 15020 (/stats/prometheus) on every pod that has an istio-proxy
+# container, across ALL namespaces. A single PodMonitor here covers all app
+# namespaces — no per-namespace PodMonitors are needed.
+#
+# Port 15020 is opened by the sidecar on the pod directly and is not
+# necessarily exposed as a named port on a Kubernetes Service, which is why
+# a PodMonitor (pod-direct scrape) is used instead of a ServiceMonitor.
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: istio-proxies
+  namespace: istio-system
+  labels:
+    app: istio-proxies
+spec:
+  selector:
+    matchExpressions:
+      - key: istio-prometheus-ignore
+        operator: DoesNotExist
+  namespaceSelector:
+    any: true        # scrape all namespaces
+  jobLabel: envoy-stats
+  podMetricsEndpoints:
+    - path: /stats/prometheus
+      targetPort: 15020
+      interval: 15s
+      relabelings:
+        - action: keep
+          sourceLabels: [__meta_kubernetes_pod_container_name]
+          regex: "istio-proxy"
+        # Preserve useful metadata labels on each time series
+        - action: labelmap
+          regex: __meta_kubernetes_pod_label_(.+)
+        - sourceLabels: [__meta_kubernetes_namespace]
+          action: replace
+          targetLabel: namespace
+        - sourceLabels: [__meta_kubernetes_pod_name]
+          action: replace
+          targetLabel: pod_name
+---
+# ServiceMonitor for the istiod control plane process.
+# Istiod exposes its own metrics on port 15014 via the 'istiod' Service.
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: istiod
+  namespace: istio-system
+  labels:
+    app: istiod
+spec:
+  selector:
+    matchLabels:
+      app: istiod
+  namespaceSelector:
+    matchNames:
+      - istio-system
+  endpoints:
+    - port: http-monitoring
+      interval: 15s

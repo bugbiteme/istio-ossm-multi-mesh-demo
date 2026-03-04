@@ -415,18 +415,106 @@ oc --context="${CTX_EAST}" apply -f manifests/federation/east/vs-failover-east.y
 
 ---
 
-## Part 5: Verification
+## Part 5: Observability (Kiali)
+
+Kiali provides a real-time traffic graph, service topology, and Istio config validation. Each cluster gets its own Kiali instance. There is no cross-cluster combined view in standard Kiali — you switch between instances to see each cluster.
+
+### 5.1 Install the Kiali Operator
+
+On **both** clusters, install the Kiali Operator from OperatorHub:
+
+1. Navigate to **Operators → OperatorHub**
+2. Search for `Kiali Operator` (community) or `Kiali` (Red Hat supported)
+3. Install to all namespaces using the default channel
+
+### 5.2 Enable user workload monitoring
+
+OpenShift's built-in Prometheus stack does not scrape user namespaces by default. Enable it on **both** clusters:
+
+```bash
+for CTX in "${CTX_EAST}" "${CTX_WEST}"; do
+  oc --context="${CTX}" apply \
+    -f manifests/monitoring/user-workload-monitoring.yaml
+done
+```
+
+Wait for the user workload Prometheus to start:
+
+```bash
+oc --context="${CTX_EAST}" rollout status statefulset prometheus-user-workload \
+  -n openshift-user-workload-monitoring
+oc --context="${CTX_WEST}" rollout status statefulset prometheus-user-workload \
+  -n openshift-user-workload-monitoring
+```
+
+### 5.3 Deploy Istio ServiceMonitors
+
+The Sail Operator does not create Prometheus ServiceMonitors automatically. Apply them to **both** clusters:
+
+```bash
+for CTX in "${CTX_EAST}" "${CTX_WEST}"; do
+  oc --context="${CTX}" apply -n istio-system \
+    -f manifests/monitoring/istio-service-monitors.yaml
+done
+```
+
+### 5.4 Deploy Kiali
+
+Grant the Kiali service account permission to query the OpenShift monitoring stack. Without this, Kiali gets HTTP 403 on all Prometheus requests and the traffic graph will not load:
+
+```bash
+for CTX in "${CTX_EAST}" "${CTX_WEST}"; do
+  oc --context="${CTX}" apply \
+    -f manifests/monitoring/kiali-monitoring-rbac.yaml
+done
+```
+
+Then deploy Kiali:
+
+```bash
+for CTX in "${CTX_EAST}" "${CTX_WEST}"; do
+  oc --context="${CTX}" apply -n istio-system \
+    -f manifests/monitoring/kiali.yaml
+done
+```
+
+Wait for Kiali to be ready:
+
+```bash
+oc --context="${CTX_EAST}" rollout status deployment kiali -n istio-system
+oc --context="${CTX_WEST}" rollout status deployment kiali -n istio-system
+```
+
+Get the Kiali URLs:
+
+```bash
+echo "East Kiali:"
+oc --context="${CTX_EAST}" get route kiali -n istio-system \
+  -o jsonpath='https://{.spec.host}{"\n"}'
+
+echo "West Kiali:"
+oc --context="${CTX_WEST}" get route kiali -n istio-system \
+  -o jsonpath='https://{.spec.host}{"\n"}'
+```
+
+Open the URL in a browser and navigate to **Graph → Namespace** to see the live traffic topology. Generate traffic with the validation loop in Part 6 to populate the graph.
+
+> **Cross-cluster traffic:** Traffic that crosses the east-west gateway appears as calls to `istio-eastwestgateway` in the source cluster's graph. On the destination cluster's graph, it appears as inbound traffic from `PassthroughCluster`. This is expected — the SNI-DNAT passthrough means Kiali on the source side sees the gateway, not the remote service, as the next hop.
+
+---
+
+## Part 6: Verification
 
 Run all checks at once with `bash scripts/05-verify.sh`, or step through them individually below.
 
-### 5.1 Control plane health
+### 6.1 Control plane health
 
 ```bash
 oc --context="${CTX_EAST}" get istio default -n istio-system
 oc --context="${CTX_WEST}" get istio default -n istio-system
 ```
 
-### 5.2 Remote cluster sync
+### 6.2 Remote cluster sync
 
 ```bash
 istioctl --context="${CTX_EAST}" remote-clusters
@@ -435,7 +523,7 @@ istioctl --context="${CTX_WEST}" remote-clusters
 
 Both should report the remote cluster as `synced: true`.
 
-### 5.3 Cross-cluster endpoints visible from travels proxy
+### 6.3 Cross-cluster endpoints visible from travels proxy
 
 ```bash
 TRAVELS_POD=$(oc --context="${CTX_EAST}" get pod -n travel-agency \
@@ -447,7 +535,7 @@ istioctl --context="${CTX_EAST}" proxy-config endpoints \
 
 You should see endpoints from the West cluster's IP range for both services.
 
-### 5.4 Confirm discounts on West is NOT visible from East
+### 6.4 Confirm discounts on West is NOT visible from East
 
 ```bash
 istioctl --context="${CTX_EAST}" proxy-config endpoints \
@@ -456,7 +544,7 @@ istioctl --context="${CTX_EAST}" proxy-config endpoints \
 
 Only East's local `discounts` endpoint should appear — West's `discounts` must not be present.
 
-### 5.5 mTLS verification
+### 6.5 mTLS verification
 
 ```bash
 istioctl --context="${CTX_EAST}" authn tls-check \
@@ -470,7 +558,7 @@ istioctl --context="${CTX_EAST}" authn tls-check \
 
 Both should show `mTLS` as the active mode.
 
-### 5.6 Proxy sync status
+### 6.6 Proxy sync status
 
 ```bash
 istioctl --context="${CTX_EAST}" proxy-status
@@ -479,7 +567,7 @@ istioctl --context="${CTX_WEST}" proxy-status
 
 All proxies should show `SYNCED` for `CDS`, `LDS`, `EDS`, and `RDS`. Any `STALE` entries indicate a configuration push is in progress or blocked.
 
-### 5.7 End-to-end functional test
+### 6.7 End-to-end functional test
 
 ```bash
 oc --context="${CTX_EAST}" run test-client \

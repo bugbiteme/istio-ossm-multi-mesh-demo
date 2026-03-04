@@ -1,0 +1,18 @@
+# Grants the Kiali service account read access to the OpenShift monitoring stack.
+# Required when Kiali uses thanos-querier as its Prometheus backend.
+# Without this, Kiali gets HTTP 403 on all Prometheus queries.
+# Apply to BOTH clusters:
+#   oc --context="${CTX_EAST}" apply -f manifests/monitoring/kiali-monitoring-rbac.yaml
+#   oc --context="${CTX_WEST}" apply -f manifests/monitoring/kiali-monitoring-rbac.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: kiali-monitoring-view
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cluster-monitoring-view
+subjects:
+  - kind: ServiceAccount
+    name: kiali-service-account
+    namespace: istio-system
