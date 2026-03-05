@@ -660,7 +660,7 @@ The response should include pricing data from `hotels` and `insurances`, which a
 ```bash
 oc --context="${CTX_EAST}" run load-gen \
   --image=curlimages/curl --restart=Never -n travel-agency \
-  -- sh -c 'while true; do curl -s http://travels.travel-agency:8000/travels/Moscow > /dev/null; sleep 5; done'
+  -- sh -c 'while true; do curl -s http://travels.travel-agency:8000/travels/Moscow; sleep 5; done'
 ```
 
 This runs in the background (no -it --rm). To stop it:
