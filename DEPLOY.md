@@ -571,16 +571,20 @@ Only East's local `discounts` endpoint should appear — West's `discounts` must
 ### 6.5 mTLS verification
 
 ```bash
-istioctl --context="${CTX_EAST}" authn tls-check \
-  ${TRAVELS_POD}.travel-agency \
-  hotels.travel-agency.svc.cluster.local
+istioctl --context="${CTX_EAST}" proxy-config cluster \
+  -n travel-agency "${TRAVELS_POD}" \
+  --fqdn hotels.travel-agency.svc.cluster.local \
+  -o json | jq '.[0].transportSocket.name'
 
-istioctl --context="${CTX_EAST}" authn tls-check \
-  ${TRAVELS_POD}.travel-agency \
-  insurances.travel-agency.svc.cluster.local
+istioctl --context="${CTX_EAST}" proxy-config cluster \
+  -n travel-agency "${TRAVELS_POD}" \
+  --fqdn insurances.travel-agency.svc.cluster.local \
+  -o json | jq '.[0].transportSocket.name'
 ```
 
-Both should show `mTLS` as the active mode.
+Both should output `"envoy.transport_sockets.tls"`, confirming mTLS is active. A result of `null` or absent means the cluster is using plaintext.
+
+> **Note:** `istioctl authn tls-check` was removed in Istio 1.6. The `proxy-config cluster` JSON output is the current equivalent — the presence of `envoy.transport_sockets.tls` as the transport socket confirms ISTIO_MUTUAL TLS is configured by the DestinationRule.
 
 ### 6.6 Proxy sync status
 
@@ -601,6 +605,17 @@ oc --context="${CTX_EAST}" run test-client \
 
 The response should include pricing data from `hotels` and `insurances`, which are served by West.
 
+```bash
+oc --context="${CTX_EAST}" run load-gen \
+  --image=curlimages/curl --restart=Never -n travel-agency \
+  -- sh -c 'while true; do curl -s http://travels.travel-agency:8000/travels/Moscow > /dev/null; sleep 5; done'
+```
+
+This runs in the background (no -it --rm). To stop it:
+
+```bash
+oc --context="${CTX_EAST}" delete pod load-gen -n travel-agency
+```
 ---
 
 ## Federation Service Map
