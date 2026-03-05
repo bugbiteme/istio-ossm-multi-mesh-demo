@@ -370,9 +370,61 @@ oc --context="${CTX_WEST}" apply \
 
 ---
 
-## Part 4: Istio Federation Configuration
+## Part 4: Local Verification (pre-federation)
 
-### 4.1 Service visibility and DestinationRules on East
+Verify each cluster is healthy in isolation before applying any federation config. This establishes a baseline and makes cross-cluster issues easier to diagnose later.
+
+### 4.1 Pod health on East
+
+```bash
+oc --context="${CTX_EAST}" get pods -n travel-agency
+oc --context="${CTX_EAST}" get pods -n travel-portal
+oc --context="${CTX_EAST}" get pods -n travel-control
+```
+
+All pods should be `2/2 Running` (app container + Envoy sidecar).
+
+### 4.2 Pod health on West
+
+```bash
+oc --context="${CTX_WEST}" get pods -n travel-agency
+```
+
+All pods (`hotels-v1`, `insurances-v1`, `discounts-v1`, `mysqldb-v1`) should be `2/2 Running`.
+
+### 4.3 Functional test on East (local services only)
+
+At this point East's `travels` calls its own local copies of `hotels` and `insurances`. No cross-cluster traffic is configured yet.
+
+```bash
+oc --context="${CTX_EAST}" run test-client \
+  --image=curlimages/curl --restart=Never -n travel-agency \
+  --rm -it -- curl -s http://travels.travel-agency:8000/travels/Moscow
+```
+
+The response should include `flights`, `cars`, `hotels`, and `insurances` data — all from East's local services.
+
+### 4.4 Functional test on West (local services only)
+
+Verify West's `hotels` and `insurances` are reachable from within the cluster:
+
+```bash
+oc --context="${CTX_WEST}" run test-client \
+  --image=curlimages/curl --restart=Never -n travel-agency \
+  --rm -it -- curl -s http://hotels.travel-agency:8000/hotels/Moscow
+
+oc --context="${CTX_WEST}" run test-client \
+  --image=curlimages/curl --restart=Never -n travel-agency \
+  --rm -it -- curl -s http://insurances.travel-agency:8000/insurances/Moscow
+```
+
+Both should return JSON arrays. If either fails, debug the local deployment before proceeding to federation.
+
+---
+
+## Part 5: Istio Federation Configuration
+
+### 5.1 Service visibility and DestinationRules on East
 
 East's `travel-agency` services are all private. The manifest [`manifests/federation/east/east-federation.yaml`](manifests/federation/east/east-federation.yaml) applies two resources:
 
@@ -383,7 +435,7 @@ East's `travel-agency` services are all private. The manifest [`manifests/federa
 oc --context="${CTX_EAST}" apply -f manifests/federation/east/east-federation.yaml
 ```
 
-### 4.2 Service visibility and DestinationRules on West
+### 5.2 Service visibility and DestinationRules on West
 
 `hotels` and `insurances` are exported (`exportTo: ["*"]`). `discounts` stays private. Apply [`manifests/federation/west/west-federation.yaml`](manifests/federation/west/west-federation.yaml) and annotate the services.
 
@@ -398,7 +450,7 @@ oc --context="${CTX_WEST}" annotate svc insurances -n travel-agency \
   networking.istio.io/exportTo="*" --overwrite
 ```
 
-### 4.3 AuthorizationPolicies on West
+### 5.3 AuthorizationPolicies on West
 
 Restrict which identities can call `hotels` and `insurances`. Only the `travels` service account from the `travel-agency` namespace on East is permitted.
 
@@ -415,7 +467,7 @@ Then apply the policies:
 oc --context="${CTX_WEST}" apply -f manifests/federation/west/authz-west.yaml
 ```
 
-### 4.4 Traffic management on East (optional — failover)
+### 5.4 Traffic management on East (optional — failover)
 
 If you later deploy `hotels` or `insurances` on East as failover replicas, apply [`manifests/federation/east/vs-failover-east.yaml`](manifests/federation/east/vs-failover-east.yaml) for weighted routing with local preference:
 
@@ -423,15 +475,15 @@ If you later deploy `hotels` or `insurances` on East as failover replicas, apply
 oc --context="${CTX_EAST}" apply -f manifests/federation/east/vs-failover-east.yaml
 ```
 
-> **Script:** `bash scripts/04-configure-federation.sh` runs Parts 4.1–4.3.
+> **Script:** `bash scripts/04-configure-federation.sh` runs Parts 5.1–5.3.
 
 ---
 
-## Part 5: Observability (Kiali)
+## Part 6: Observability (Kiali)
 
 Kiali provides a real-time traffic graph, service topology, and Istio config validation. Each cluster gets its own Kiali instance. There is no cross-cluster combined view in standard Kiali — you switch between instances to see each cluster.
 
-### 5.1 Install the Kiali Operator
+### 6.1 Install the Kiali Operator
 
 On **both** clusters, install the Kiali Operator from OperatorHub:
 
@@ -439,7 +491,7 @@ On **both** clusters, install the Kiali Operator from OperatorHub:
 2. Search for `Kiali Operator` (community) or `Kiali` (Red Hat supported)
 3. Install to all namespaces using the default channel
 
-### 5.2 Enable user workload monitoring
+### 6.2 Enable user workload monitoring
 
 OpenShift's built-in Prometheus stack does not scrape user namespaces by default. Enable it on **both** clusters:
 
@@ -459,7 +511,7 @@ oc --context="${CTX_WEST}" rollout status statefulset prometheus-user-workload \
   -n openshift-user-workload-monitoring
 ```
 
-### 5.3 Deploy Istio scrape config
+### 6.3 Deploy Istio scrape config
 
 The Sail Operator does not create Prometheus scrape config automatically. Apply the istiod ServiceMonitor to `istio-system` on **both** clusters:
 
@@ -482,7 +534,7 @@ oc --context="${CTX_WEST}" apply -n travel-agency \
   -f manifests/monitoring/podmonitor.yaml
 ```
 
-### 5.4 Deploy Kiali
+### 6.4 Deploy Kiali
 
 Grant the Kiali service account permission to query the OpenShift monitoring stack. Without this, Kiali gets HTTP 403 on all Prometheus requests and the traffic graph will not load:
 
@@ -521,24 +573,24 @@ oc --context="${CTX_WEST}" get route kiali -n istio-system \
   -o jsonpath='https://{.spec.host}{"\n"}'
 ```
 
-Open the URL in a browser and navigate to **Graph → Namespace** to see the live traffic topology. Generate traffic with the validation loop in Part 6 to populate the graph.
+Open the URL in a browser and navigate to **Graph → Namespace** to see the live traffic topology. Generate traffic with the validation loop in Part 7 to populate the graph.
 
 > **Cross-cluster traffic:** Traffic that crosses the east-west gateway appears as calls to `istio-eastwestgateway` in the source cluster's graph. On the destination cluster's graph, it appears as inbound traffic from `PassthroughCluster`. This is expected — the SNI-DNAT passthrough means Kiali on the source side sees the gateway, not the remote service, as the next hop.
 
 ---
 
-## Part 6: Verification
+## Part 7: Verification (post-federation)
 
 Run all checks at once with `bash scripts/05-verify.sh`, or step through them individually below.
 
-### 6.1 Control plane health
+### 7.1 Control plane health
 
 ```bash
 oc --context="${CTX_EAST}" get istio default -n istio-system
 oc --context="${CTX_WEST}" get istio default -n istio-system
 ```
 
-### 6.2 Remote cluster sync
+### 7.2 Remote cluster sync
 
 ```bash
 istioctl --context="${CTX_EAST}" remote-clusters
@@ -547,7 +599,7 @@ istioctl --context="${CTX_WEST}" remote-clusters
 
 Both should report the remote cluster as `synced: true`.
 
-### 6.3 Cross-cluster endpoints visible from travels proxy
+### 7.3 Cross-cluster endpoints visible from travels proxy
 
 ```bash
 TRAVELS_POD=$(oc --context="${CTX_EAST}" get pod -n travel-agency \
@@ -559,7 +611,7 @@ istioctl --context="${CTX_EAST}" proxy-config endpoints \
 
 You should see endpoints from the West cluster's IP range for both services.
 
-### 6.4 Confirm discounts on West is NOT visible from East
+### 7.4 Confirm discounts on West is NOT visible from East
 
 ```bash
 istioctl --context="${CTX_EAST}" proxy-config endpoints \
@@ -568,7 +620,7 @@ istioctl --context="${CTX_EAST}" proxy-config endpoints \
 
 Only East's local `discounts` endpoint should appear — West's `discounts` must not be present.
 
-### 6.5 mTLS verification
+### 7.5 mTLS verification
 
 ```bash
 istioctl --context="${CTX_EAST}" proxy-config cluster \
@@ -586,7 +638,7 @@ Both should output `"envoy.transport_sockets.tls"`, confirming mTLS is active. A
 
 > **Note:** `istioctl authn tls-check` was removed in Istio 1.6. The `proxy-config cluster` JSON output is the current equivalent — the presence of `envoy.transport_sockets.tls` as the transport socket confirms ISTIO_MUTUAL TLS is configured by the DestinationRule.
 
-### 6.6 Proxy sync status
+### 7.6 Proxy sync status
 
 ```bash
 istioctl --context="${CTX_EAST}" proxy-status
@@ -595,7 +647,7 @@ istioctl --context="${CTX_WEST}" proxy-status
 
 All proxies should show `SYNCED` for `CDS`, `LDS`, `EDS`, and `RDS`. Any `STALE` entries indicate a configuration push is in progress or blocked.
 
-### 6.7 End-to-end functional test
+### 7.7 End-to-end functional test
 
 ```bash
 oc --context="${CTX_EAST}" run test-client \
