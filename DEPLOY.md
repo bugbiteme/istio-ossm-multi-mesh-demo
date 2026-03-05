@@ -447,15 +447,27 @@ oc --context="${CTX_WEST}" rollout status statefulset prometheus-user-workload \
   -n openshift-user-workload-monitoring
 ```
 
-### 5.3 Deploy Istio ServiceMonitors
+### 5.3 Deploy Istio scrape config
 
-The Sail Operator does not create Prometheus ServiceMonitors automatically. Apply them to **both** clusters:
+The Sail Operator does not create Prometheus scrape config automatically. Apply the istiod ServiceMonitor to `istio-system` on **both** clusters:
 
 ```bash
 for CTX in "${CTX_EAST}" "${CTX_WEST}"; do
   oc --context="${CTX}" apply -n istio-system \
     -f manifests/monitoring/istio-service-monitors.yaml
 done
+```
+
+Then apply the sidecar PodMonitor to **every application namespace** on both clusters. OpenShift user workload monitoring picks up PodMonitors from the namespace the workload runs in — a cluster-wide `namespaceSelector: any: true` from `istio-system` is not reliably honored:
+
+```bash
+for NS in travel-agency travel-portal travel-control; do
+  oc --context="${CTX_EAST}" apply -n "${NS}" \
+    -f manifests/monitoring/podmonitor.yaml
+done
+
+oc --context="${CTX_WEST}" apply -n travel-agency \
+  -f manifests/monitoring/podmonitor.yaml
 ```
 
 ### 5.4 Deploy Kiali

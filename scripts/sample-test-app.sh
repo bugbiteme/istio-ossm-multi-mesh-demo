@@ -32,6 +32,11 @@ oc --context="${CTX_WEST}" annotate svc helloworld -n sample \
 
 oc --context="${CTX_WEST}" wait --for condition=available -n sample deployment/sleep
 
+### Add Pod Mon to namespace
+
+oc --context="${CTX_EAST}" apply -f manifests/monitoring/podmonitor.yaml -n sample
+oc --context="${CTX_WEST}" apply -f manifests/monitoring/podmonitor.yaml -n sample
+
 ### Validate
 echo "East"
 for i in {0..9}; do 
