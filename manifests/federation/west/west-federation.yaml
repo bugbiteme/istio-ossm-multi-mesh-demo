@@ -1,5 +1,29 @@
 # West federation config — hotels and insurances exported; discounts stays private.
 ---
+apiVersion: security.istio.io/v1
+kind: PeerAuthentication
+metadata:
+  name: travel-agency-mtls
+  namespace: travel-agency
+spec:
+  mtls:
+    mode: STRICT
+---
+apiVersion: security.istio.io/v1
+kind: PeerAuthentication
+metadata:
+  name: mysqldb-mtls-exception
+  namespace: travel-agency
+spec:
+  selector:
+    matchLabels:
+      app: mysqldb
+  mtls:
+    mode: STRICT
+  portLevelMtls:
+    "3306":
+      mode: DISABLE
+---
 apiVersion: networking.istio.io/v1
 kind: DestinationRule
 metadata:

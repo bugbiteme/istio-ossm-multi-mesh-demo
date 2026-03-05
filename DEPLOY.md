@@ -327,15 +327,15 @@ for NS in travel-agency travel-portal travel-control; do
 done
 
 oc --context="${CTX_EAST}" apply \
-  -f https://raw.githubusercontent.com/kiali/demos/master/travels/travel_agency.yaml \
+  -f manifests/apps/east/travel-agency-east.yaml \
   -n travel-agency
 
 oc --context="${CTX_EAST}" apply \
-  -f https://raw.githubusercontent.com/kiali/demos/master/travels/travel_portal.yaml \
+  -f manifests/apps/east/travel_portal.yaml \
   -n travel-portal
 
 oc --context="${CTX_EAST}" apply \
-  -f https://raw.githubusercontent.com/kiali/demos/master/travels/travel_control.yaml \
+  -f manifests/apps/east/travel_control.yaml \
   -n travel-control
 ```
 
@@ -660,7 +660,7 @@ The response should include pricing data from `hotels` and `insurances`, which a
 ```bash
 oc --context="${CTX_EAST}" run load-gen \
   --image=curlimages/curl --restart=Never -n travel-agency \
-  -- sh -c 'while true; do curl -s http://travels.travel-agency:8000/travels/Moscow; sleep 5; done'
+  -- sh -c 'while true; do curl -s http://travels.travel-agency:8000/travels/Moscow; sleep 1; done'
 ```
 
 This runs in the background (no -it --rm). To stop it:

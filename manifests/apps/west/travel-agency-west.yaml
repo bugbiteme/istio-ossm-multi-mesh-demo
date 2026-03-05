@@ -36,6 +36,8 @@ spec:
       version: v1
   template:
     metadata:
+      annotations:
+        readiness.status.sidecar.istio.io/applicationPorts: ""
       labels:
         app: mysqldb
         version: v1
@@ -86,6 +88,8 @@ spec:
   replicas: 1
   template:
     metadata:
+      annotations:
+        readiness.status.sidecar.istio.io/applicationPorts: ""
       labels:
         app: discounts
         version: v1
@@ -136,6 +140,8 @@ spec:
   replicas: 1
   template:
     metadata:
+      annotations:
+        readiness.status.sidecar.istio.io/applicationPorts: ""
       labels:
         app: hotels
         version: v1
@@ -199,6 +205,8 @@ spec:
   replicas: 1
   template:
     metadata:
+      annotations:
+        readiness.status.sidecar.istio.io/applicationPorts: ""
       labels:
         app: insurances
         version: v1
