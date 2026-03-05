@@ -1,4 +1,15 @@
 # East federation config — all travel-agency services are private (no cross-cluster export).
+# PeerAuthentication enforces STRICT mTLS for the namespace so that the DestinationRule
+# ISTIO_MUTUAL mode is honoured by both the client and server sidecars.
+apiVersion: security.istio.io/v1
+kind: PeerAuthentication
+metadata:
+  name: travel-agency-mtls
+  namespace: travel-agency
+spec:
+  mtls:
+    mode: STRICT
+---
 apiVersion: networking.istio.io/v1
 kind: DestinationRule
 metadata:

@@ -18,6 +18,18 @@ oc --context="${CTX_WEST}" annotate svc hotels -n travel-agency \
 oc --context="${CTX_WEST}" annotate svc insurances -n travel-agency \
   networking.istio.io/exportTo="*" --overwrite
 
+echo "==> Creating 'travels' ServiceAccount on West (required for AuthorizationPolicy principal resolution)..."
+oc --context="${CTX_WEST}" apply -f "${REPO_ROOT}/manifests/federation/west/travels-sa-west.yaml"
+
+# Wait for the SA to appear in the API server and propagate into the Istio
+# admission webhook's informer cache. Without this pause the webhook rejects the
+# AuthorizationPolicy with "Service Account not found for this principal".
+echo "==> Waiting for 'travels' ServiceAccount to be visible to the Istio webhook..."
+oc --context="${CTX_WEST}" wait serviceaccount travels \
+  -n travel-agency \
+  --for=jsonpath='{.metadata.name}'=travels \
+  --timeout=60s
+
 echo "==> Applying AuthorizationPolicies on West..."
 oc --context="${CTX_WEST}" apply -f "${REPO_ROOT}/manifests/federation/west/authz-west.yaml"
 

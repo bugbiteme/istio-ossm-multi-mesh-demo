@@ -374,7 +374,10 @@ oc --context="${CTX_WEST}" apply \
 
 ### 4.1 Service visibility and DestinationRules on East
 
-East's `travel-agency` services are all private. Apply [`manifests/federation/east/east-federation.yaml`](manifests/federation/east/east-federation.yaml):
+East's `travel-agency` services are all private. The manifest [`manifests/federation/east/east-federation.yaml`](manifests/federation/east/east-federation.yaml) applies two resources:
+
+1. **PeerAuthentication** (`STRICT`) — required before setting `tls.mode: ISTIO_MUTUAL` on a DestinationRule. Without it, the receiving sidecar does not mandate mTLS and traffic can silently fall back to plaintext, breaking the mutual-TLS handshake expected by the client.
+2. **DestinationRule** — selects `*.travel-agency.svc.cluster.local` and sets `ISTIO_MUTUAL` so Envoy uses the workload certificate injected by istiod.
 
 ```bash
 oc --context="${CTX_EAST}" apply -f manifests/federation/east/east-federation.yaml
@@ -397,7 +400,16 @@ oc --context="${CTX_WEST}" annotate svc insurances -n travel-agency \
 
 ### 4.3 AuthorizationPolicies on West
 
-Restrict which identities can call `hotels` and `insurances`. Only the `travels` service account from the `travel-agency` namespace on East is permitted. Apply [`manifests/federation/west/authz-west.yaml`](manifests/federation/west/authz-west.yaml):
+Restrict which identities can call `hotels` and `insurances`. Only the `travels` service account from the `travel-agency` namespace on East is permitted.
+
+**Prerequisite — create the `travels` ServiceAccount on West.**
+In a multi-mesh setup each cluster has its own control plane and trust domain. When East's `travels` sidecar calls a West service over the east-west gateway it presents an mTLS certificate whose SPIFFE URI encodes the service account: `spiffe://cluster.local/ns/travel-agency/sa/travels`. West's istiod must be able to resolve that identity locally when it programs the Envoy RBAC filter for the AuthorizationPolicy. If the `travels` ServiceAccount does not exist on West, the principal lookup returns nothing and the ALLOW rule never matches — all cross-cluster calls from `travels` are denied regardless of the cert.
+
+```bash
+oc --context="${CTX_WEST}" apply -f manifests/federation/west/travels-sa-west.yaml
+```
+
+Then apply the policies:
 
 ```bash
 oc --context="${CTX_WEST}" apply -f manifests/federation/west/authz-west.yaml
