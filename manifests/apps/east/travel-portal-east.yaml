@@ -1,3 +1,11 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: travels-voyages
+  labels:
+    account: voyages
+    app: voyages
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -12,28 +20,11 @@ spec:
     metadata:
       annotations:
         readiness.status.sidecar.istio.io/applicationPorts: ""
-        proxy.istio.io/config: |
-          tracing:
-            zipkin:
-              address: zipkin.istio-system:9411
-            sampling: 10
-            custom_tags:
-              http.header.portal:
-                header:
-                  name: portal
-              http.header.device:
-                header:
-                  name: device
-              http.header.user:
-                header:
-                  name: user
-              http.header.travel:
-                header:
-                  name: travel
       labels:
         app: voyages
         version: v1
     spec:
+      serviceAccountName: travels-voyages
       containers:
         - name: voyages
           image: quay.io/kiali/demo_travels_portal:v1
@@ -72,6 +63,14 @@ spec:
   selector:
     app: voyages
 ---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: travels-viaggi
+  labels:
+    account: viaggi
+    app: viaggi
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -86,28 +85,11 @@ spec:
     metadata:
       annotations:
         readiness.status.sidecar.istio.io/applicationPorts: ""
-        proxy.istio.io/config: |
-          tracing:
-            zipkin:
-              address: zipkin.istio-system:9411
-            sampling: 10
-            custom_tags:
-              http.header.portal:
-                header:
-                  name: portal
-              http.header.device:
-                header:
-                  name: device
-              http.header.user:
-                header:
-                  name: user
-              http.header.travel:
-                header:
-                  name: travel
       labels:
         app: viaggi
         version: v1
     spec:
+      serviceAccountName: travels-viaggi
       containers:
         - name: control
           image: quay.io/kiali/demo_travels_portal:v1
@@ -146,6 +128,14 @@ spec:
   selector:
     app: viaggi
 ---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: travels-portal-travels
+  labels:
+    account: travels
+    app: travels
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -160,28 +150,11 @@ spec:
     metadata:
       annotations:
         readiness.status.sidecar.istio.io/applicationPorts: ""
-        proxy.istio.io/config: |
-          tracing:
-            zipkin:
-              address: zipkin.istio-system:9411
-            sampling: 10
-            custom_tags:
-              http.header.portal:
-                header:
-                  name: portal
-              http.header.device:
-                header:
-                  name: device
-              http.header.user:
-                header:
-                  name: user
-              http.header.travel:
-                header:
-                  name: travel
       labels:
         app: travels
         version: v1
     spec:
+      serviceAccountName: travels-portal-travels
       containers:
         - name: control
           image: quay.io/kiali/demo_travels_portal:v1
@@ -219,3 +192,68 @@ spec:
       port: 8000
   selector:
     app: travels
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: travels-viaje
+  labels:
+    account: viaje
+    app: viaje
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: viaje
+spec:
+  selector:
+    matchLabels:
+      app: viaje
+      version: v1
+  replicas: 1
+  template:
+    metadata:
+      annotations:
+        readiness.status.sidecar.istio.io/applicationPorts: ""
+      labels:
+        app: viaje
+        version: v1
+    spec:
+      serviceAccountName: travels-viaje
+      containers:
+        - name: control
+          image: quay.io/kiali/demo_travels_portal:v1
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8000
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+            privileged: false
+            readOnlyRootFilesystem: true
+          env:
+            - name: LISTEN_ADDRESS
+              value: ":8000"
+            - name: PORTAL_COORDINATES
+              value: "41.890668,12.492194"
+            - name: PORTAL_COUNTRY
+              value: "Spain"
+            - name: PORTAL_NAME
+              value: "viaje.es"
+            - name: TRAVELS_AGENCY_SERVICE
+              value: "http://travels.travel-agency:8000"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: viaje
+  labels:
+    app: viaje
+spec:
+  ports:
+    - name: http
+      port: 8000
+  selector:
+    app: viaje
