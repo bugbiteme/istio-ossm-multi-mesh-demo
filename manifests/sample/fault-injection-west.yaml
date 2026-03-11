@@ -1,3 +1,4 @@
+# Apply this to the helloworld-v2 service to inject a fault injection filter on the remote (west) cluster.
 apiVersion: networking.istio.io/v1alpha3
 kind: EnvoyFilter
 metadata:
@@ -26,4 +27,4 @@ spec:
           abort:
             http_status: 503
             percentage:
-              numerator: 100 # 100% failure for your test
+              numerator: 50 # 50% failure for your test

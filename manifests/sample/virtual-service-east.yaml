@@ -1,0 +1,16 @@
+apiVersion: networking.istio.io/v1
+kind: VirtualService
+metadata:
+  name: helloworld-resilience
+  namespace: sample
+spec:
+  hosts:
+  - helloworld.sample.svc.cluster.local
+  http:
+  - route:
+    - destination:
+        host: helloworld.sample.svc.cluster.local
+    retries:
+      attempts: 3
+      perTryTimeout: 2s
+      retryOn: gateway-error,connect-failure,refused-stream,5xx
