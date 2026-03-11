@@ -6,7 +6,7 @@ export CTX_EAST="admin-east"
 export CTX_WEST="admin-west"
 
 # export ISTIO_VERSION="1.27.5"
-export ISTIO_VERSION="1.26.8"
+export ISTIO_VERSION="1.27.5"
 export MESH_ID="mesh1"
 export EAST_CLUSTER="cluster-east"
 export WEST_CLUSTER="cluster-west"

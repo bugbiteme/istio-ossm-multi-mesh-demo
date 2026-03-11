@@ -42,6 +42,7 @@ travel-portal                              (no portal)
 |---|---|
 | OpenShift clusters | Two OCP clusters, version 4.18–4.20 |
 | OSSM 3 Operator | Installed on both clusters via OperatorHub |
+| Kiali Operator | Installed on both clusters via OperatorHub |
 | cert-manager Operator | Installed on both clusters via OperatorHub |
 | `oc` CLI | Configured with contexts for both clusters |
 | `istioctl` | Version matching Istio 1.27.5 |

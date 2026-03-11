@@ -13,7 +13,7 @@ sudo dnf module install nodejs:24 -y
 node --version
 npm --version
 
-#install claude-code
+#install claude-code (if using anthropic)
 sudo npm install -g @anthropic-ai/claude-code
 
 # Download the latest istio release
