@@ -1,0 +1,13 @@
+apiVersion: networking.istio.io/v1
+kind: VirtualService
+metadata:
+  name: ratings-dr
+  namespace: bookinfo
+spec:
+  host: ratings.bookinfo.svc.cluster.local
+  trafficPolicy:
+    outlierDetection:
+      consecutive5xxErrors: 1
+      interval: 10s
+      baseEjectionTime: 30s
+      maxEjectionPercent: 100
