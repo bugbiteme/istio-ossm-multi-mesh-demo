@@ -35,4 +35,4 @@ resources:
   - productpage-v1-deployment.yaml
   # 5. Gateway API (depend on Services)
   - bookinfo-gw.yaml
-  - bookinfo-httproute.yaml
+  - productpage-httproute.yaml
