@@ -3,6 +3,9 @@ kind: HTTPRoute
 metadata:
   name: bookinfo
   namespace: bookinfo
+  labels:
+    app: productpage
+    
 spec:
   parentRefs:
   - group: gateway.networking.k8s.io
