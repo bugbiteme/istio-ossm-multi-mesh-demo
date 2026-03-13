@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+
+  labels:
+    # needed for istio discovery/injection
+    istio-discovery: enabled
+    istio-injection: enabled
+    
+    # needed for multi-cluster
+    topology.istio.io/network: network1
+
+  name: bookinfo
+spec:
+  finalizers:
+  - kubernetes
