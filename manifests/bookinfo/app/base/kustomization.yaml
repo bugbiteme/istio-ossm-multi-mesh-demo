@@ -1,0 +1,11 @@
+# Base: namespace + all service accounts only.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - bookinfo-ns.yaml
+  - bookinfo-details-sa.yaml
+  - bookinfo-ratings-sa.yaml
+  - bookinfo-reviews-sa.yaml
+  - bookinfo-productpage-sa.yaml
+  - podmonitor.yaml

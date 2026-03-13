@@ -1,0 +1,22 @@
+# East: base + all deployments, services, gateway, httproute.
+# kubectl apply -k manifests/bookinfo/app/east
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../base
+  # Services
+  - details-service.yaml
+  - ratings-service.yaml
+  - reviews-service.yaml
+  - productpage-service.yaml
+  # Deployments
+  - details-v1-deployment.yaml
+  - ratings-v1-deployment.yaml
+  - reviews-v1-deployment.yaml
+  - reviews-v2-deployment.yaml
+  - reviews-v3-deployment.yaml
+  - productpage-v1-deployment.yaml
+  # Gateway API
+  - bookinfo-gw.yaml
+  - productpage-httproute.yaml

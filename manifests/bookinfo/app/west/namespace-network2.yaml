@@ -1,0 +1,7 @@
+# Patch namespace to network2 for west (multi-cluster/mesh topology)
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: bookinfo
+  labels:
+    topology.istio.io/network: network2
