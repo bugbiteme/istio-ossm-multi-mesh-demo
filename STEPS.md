@@ -20,6 +20,23 @@ oc config rename-context $(oc config current-context) admin-west
 oc config use-context admin-west
 ```
 
+# Ensure `istioctl` is installed (RHEL bastion host)
+-  Download the latest istio release
+
+```bash
+curl -L https://istio.io/downloadIstio | ISTIO_VERSION=1.27.5 sh -
+
+# Move istioctl to your PATH
+sudo mv istio-*/bin/istioctl /usr/local/bin/
+
+# Verify
+istioctl version
+
+# remove download direcrtory
+m -r ./istio-1.27.5
+```
+
+
 ## Get env settings
 
 ```bash
@@ -31,6 +48,27 @@ Verify both contexts are reachable:
 ```bash
 oc --context="${CTX_EAST}" cluster-info
 oc --context="${CTX_WEST}" cluster-info
+```
+
+# Install Operators on both clusters (Note: Cert-Manager might already be installed if using RHDP)
+
+```bash
+oc --context="${CTX_EAST}" apply -k manifests/operators/
+oc --context="${CTX_WEST}" apply -k manifests/operators/
+```
+
+**Verify operators are installed (run per context):**
+
+- Check that Subscriptions exist and have an installed CSV:
+
+
+- Wait until OSSM and Kiali are ready on both clusters (PHASE `Succeeded`):
+```bash
+for CTX in "${CTX_EAST}" "${CTX_WEST}"; do
+  echo "=== $CTX ==="
+  oc --context="${CTX}" get csv -n openshift-operators -o custom-columns=NAME:.metadata.name,PHASE:.status.phase
+  oc --context="${CTX}" get csv -n cert-manager-operator -o custom-columns=NAME:.metadata.name,PHASE:.status.phase 2>/dev/null || true
+done
 ```
 
 ### Create the shared root CA
@@ -48,6 +86,36 @@ openssl x509 -req -days 3650 -signkey root-ca.key \
   -in root-ca.csr -out root-ca.crt
 cd ..
 ```
+
+### 6.2 Enable user workload monitoring
+
+OpenShift's built-in Prometheus stack does not scrape user namespaces by default. Enable it on **both** clusters:
+
+```bash
+for CTX in "${CTX_EAST}" "${CTX_WEST}"; do
+  oc --context="${CTX}" apply \
+    -f manifests/monitoring/user-workload-monitoring.yaml
+done
+```
+
+**Ensure user-workload-monitoring is up and running:**
+
+- Wait for the user workload Prometheus StatefulSet to be rolled out (run per cluster; blocks until ready):
+```bash
+oc --context="${CTX_EAST}" rollout status statefulset prometheus-user-workload \
+  -n openshift-user-workload-monitoring
+oc --context="${CTX_WEST}" rollout status statefulset prometheus-user-workload \
+  -n openshift-user-workload-monitoring
+```
+
+- Optional: list pods in the user workload monitoring namespace to confirm all are Running:
+```bash
+for CTX in "${CTX_EAST}" "${CTX_WEST}"; do
+  echo "=== $CTX ==="
+  oc --context="${CTX}" get pods -n openshift-user-workload-monitoring
+done
+```
+
 ### 1.3 Load the root CA into cert-manager
 
 The root CA is loaded as a `ClusterIssuer` on each cluster using [`manifests/cert-manager/clusterissuer.yaml`](manifests/cert-manager/clusterissuer.yaml):
@@ -65,25 +133,6 @@ for CTX in "${CTX_EAST}" "${CTX_WEST}"; do
 
   oc --context="${CTX}" apply -f manifests/cert-manager/clusterissuer.yaml
 done
-```
-### 6.2 Enable user workload monitoring
-
-OpenShift's built-in Prometheus stack does not scrape user namespaces by default. Enable it on **both** clusters:
-
-```bash
-for CTX in "${CTX_EAST}" "${CTX_WEST}"; do
-  oc --context="${CTX}" apply \
-    -f manifests/monitoring/user-workload-monitoring.yaml
-done
-```
-
-Wait for the user workload Prometheus to start:
-
-```bash
-oc --context="${CTX_EAST}" rollout status statefulset prometheus-user-workload \
-  -n openshift-user-workload-monitoring
-oc --context="${CTX_WEST}" rollout status statefulset prometheus-user-workload \
-  -n openshift-user-workload-monitoring
 ```
 
 ## Bookinfo App
