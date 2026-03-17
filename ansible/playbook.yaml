@@ -1,0 +1,24 @@
+---
+- name: Point leonlevy.lol to AWS ELB
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  vars:
+    domain: "leonlevy.lol"
+    hosted_zone_id: "{{ lookup('env', 'HOSTED_ZONE_ID') }}"
+    elb_dns_name: "{{ lookup('env', 'INGRESS_HOST') }}"
+    elb_hosted_zone_id: "{{ lookup('env', 'ELB_HOSTED_ZONE_ID')}}"
+
+  tasks:
+    - name: Create alias record for leonlevy.lol -> ELB
+      amazon.aws.route53:
+        state: present
+        zone: "{{ domain }}"
+        record: "{{ domain }}"
+        type: A
+        alias: true
+        alias_hosted_zone_id: "{{ elb_hosted_zone_id }}"
+        value: "{{ elb_dns_name }}"
+        alias_evaluate_target_health: true
+        overwrite: true
