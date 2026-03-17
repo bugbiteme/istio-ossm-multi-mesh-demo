@@ -229,8 +229,8 @@ Both must exist before continuing. If either is missing, check that the `cacerts
 Using Kustomize overlays (east → `network1`, west → `network2`):
 
 ```bash
-oc --context="${CTX_EAST}" apply -k manifests/ossm/eastwest-gateway/overlays/east
-oc --context="${CTX_WEST}" apply -k manifests/ossm/eastwest-gateway/overlays/west
+oc --context="${CTX_EAST}" apply -f manifests/ossm/eastwest-gateway/east
+oc --context="${CTX_WEST}" apply -f manifests/ossm/eastwest-gateway/west
 ```
 
 Wait for the gateway pods to be ready:
@@ -256,7 +256,7 @@ echo "East gateway: ${EAST_GW_ADDR}"
 echo "West gateway: ${WEST_GW_ADDR}"
 ```
 
-Both must be non-empty before continuing. If either is empty, the `LoadBalancer` service has not yet been assigned an external address — wait a moment and retry. On bare-metal clusters without a cloud load balancer, see the on-prem note in the Prerequisites section.
+Both must be non-empty before continuing. If either is empty, the `LoadBalancer` service has not yet been assigned an external address — wait a moment and retry. 
 
 ### 6.4 Expose services through the east-west gateways
 
@@ -310,7 +310,7 @@ oc --context="${CTX_EAST}" apply -f manifests/ossm/kiali/
 oc --context="${CTX_WEST}" apply -f manifests/ossm/kiali/
 ```
 
-Wait for Kiali to be ready:
+Wait for Kiali to be ready (this can take a moment to start):
 
 ```bash
 oc --context="${CTX_EAST}" rollout status deployment kiali -n istio-system
@@ -364,3 +364,62 @@ sh scripts/loadgen-web.sh
 
 sh scripts/loadgen-api.sh
 ```
+Give it a moment to start populating data in Kiali
+
+### 8.6 Service Mesh Testing (Chaos Engineering)
+
+### 8.6.1 Fault injection (east cluster `ratings`)
+
+To inject a fault (75% return of HTTP status `503`), apply the Envoy filter to `ratings`:
+
+```bash
+oc --context="${CTX_EAST}" -n bookinfo apply -f manifests/bookinfo/ratings-fault.yaml
+```
+
+Once applied, Kiali will start showing errors after a minute. The output from `scripts/loadgen-api.sh` will immediately show a periodic message:
+
+```json
+{
+  "error": "Sorry, product ratings are currently unavailable for this book."
+}
+```
+
+### 8.6.2 Retry
+
+Apply a `VirtualService` to `ratings` to add a retry policy:
+
+```yaml
+retries:
+  attempts: 3
+  perTryTimeout: 2s
+  retryOn: gateway-error,connect-failure,refused-stream,5xx
+```
+
+```bash
+oc --context="${CTX_EAST}" -n bookinfo apply -f manifests/bookinfo/ratings-vs.yaml
+```
+
+The load generator output will stop showing the error message. When observing traffic in Kiali, the transaction rate will be lower on the `ratings` service in **cluster-east** than on the healthy `ratings` service in **cluster-west**.
+
+### 8.6.3 Circuit breaker
+
+For outlier detection and temporarily removing a service from the load-balancing pool, apply a `DestinationRule` with a circuit breaker:
+
+```yaml
+spec:
+  host: ratings.bookinfo.svc.cluster.local
+  trafficPolicy:
+    outlierDetection:
+      consecutive5xxErrors: 1
+      interval: 10s
+      baseEjectionTime: 30s
+      maxEjectionPercent: 100
+```
+
+If one 5xx error is detected in a 10s interval, the pod is ejected for 30s before being rechecked (you can adjust these values to experiment).
+
+```bash
+oc --context="${CTX_EAST}" -n bookinfo apply -f manifests/bookinfo/ratings-dr.yaml
+```
+
+After applying, `ratings` on **cluster-east** will periodically disappear in Kiali while traffic is diverted to the healthy `ratings` service on **cluster-west**. 
