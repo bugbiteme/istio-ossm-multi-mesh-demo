@@ -2,8 +2,7 @@ apiVersion: gateway.networking.k8s.io/v1
 kind: Gateway
 metadata:
   labels:
-    app: productpage
-    version: v1
+    app: bookinfo-gw
   name: bookinfo-gw
   namespace: bookinfo
 spec:
