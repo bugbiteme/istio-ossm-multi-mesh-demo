@@ -18,12 +18,16 @@ sudo dnf install ansible-core -y
 ansible-galaxy collection install amazon.aws
 pip install boto3
 
+# Set your domain before running (e.g. export YOUR_DOMAIN=example.com)
+export YOUR_DOMAIN="<change to your domain here>"
+echo "YOUR_DOMAIN: ${YOUR_DOMAIN}"
+
 # set up AWS access id/key (if you havent already, make sure you have the [default] and [redhat] profiles)
 # aws configure
 
 #Get hosted zone ID
 export HOSTED_ZONE_ID=$(aws route53 list-hosted-zones-by-name \
-  --dns-name leonlevy.lol \
+  --dns-name ${YOUR_DOMAIN} \
   --query "HostedZones[0].Id" \
   --output text | sed 's|/hostedzone/||')
 
@@ -41,6 +45,6 @@ export ELB_HOSTED_ZONE_ID=$(aws elb describe-load-balancers --profile redhat \
 ansible-playbook ansible/playbook.yaml -e "ansible_python_interpreter=/usr/bin/python3.9"
 
 # URl should be
-# http://leonlevy.lol/productpage
+# http://${YOUR_DOMAIN}/productpage
 
-curl -so  -w "%{http_code}\n" http://leonlevy.lol/productpage | grep "<title>Simple Bookstore App</title>"
+curl -so  -w "%{http_code}\n" http://${YOUR_DOMAIN}/productpage | grep "<title>Simple Bookstore App</title>"

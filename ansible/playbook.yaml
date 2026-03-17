@@ -1,17 +1,18 @@
 ---
-- name: Point leonlevy.lol to AWS ELB
+- name: Point <your-domain> to AWS ELB
   hosts: localhost
   connection: local
   gather_facts: false
 
   vars:
-    domain: "leonlevy.lol"
+    # Set YOUR_DOMAIN env var before running (e.g. export YOUR_DOMAIN=example.com)
+    domain: "{{ lookup('env', 'YOUR_DOMAIN') }}"
     hosted_zone_id: "{{ lookup('env', 'HOSTED_ZONE_ID') }}"
     elb_dns_name: "{{ lookup('env', 'INGRESS_HOST') }}"
     elb_hosted_zone_id: "{{ lookup('env', 'ELB_HOSTED_ZONE_ID')}}"
 
   tasks:
-    - name: Create alias record for leonlevy.lol -> ELB
+    - name: Create alias record for {{ domain }} -> ELB
       amazon.aws.route53:
         state: present
         zone: "{{ domain }}"
