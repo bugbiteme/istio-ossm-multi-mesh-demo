@@ -23,3 +23,26 @@
         value: "{{ elb_dns_name }}"
         alias_evaluate_target_health: true
         overwrite: true
+
+    - name: Verify A record in Route 53
+      ansible.builtin.shell: |
+        aws route53 list-resource-record-sets \
+          --hosted-zone-id "{{ hosted_zone_id }}" \
+          --query "ResourceRecordSets[?Name=='{{ domain }}.' && Type=='A']" \
+          --output json
+      register: record_sets
+      changed_when: false
+
+    - name: Assert A record exists and is alias to ELB
+      ansible.builtin.assert:
+        that:
+          - record_sets.stdout | from_json | length == 1
+          - (record_sets.stdout | from_json)[0] is mapping
+          - (record_sets.stdout | from_json)[0].AliasTarget.DNSName is defined
+          - elb_dns_name in ((record_sets.stdout | from_json)[0].AliasTarget.DNSName)
+        fail_msg: "A record for {{ domain }} not found or does not point to {{ elb_dns_name }}"
+        success_msg: "A record {{ domain }} -> {{ elb_dns_name }} verified."
+
+    - name: Show A record details
+      ansible.builtin.debug:
+        msg: "{{ (record_sets.stdout | from_json)[0] }}"

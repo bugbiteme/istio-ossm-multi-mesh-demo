@@ -19,7 +19,7 @@ ansible-galaxy collection install amazon.aws
 pip install boto3
 
 # Set your domain before running (e.g. export YOUR_DOMAIN=example.com)
-export YOUR_DOMAIN="<change to your domain here>"
+export YOUR_DOMAIN="leonlevy.lol"
 echo "YOUR_DOMAIN: ${YOUR_DOMAIN}"
 
 # set up AWS access id/key (if you havent already, make sure you have the [default] and [redhat] profiles)
@@ -31,20 +31,22 @@ export HOSTED_ZONE_ID=$(aws route53 list-hosted-zones-by-name \
   --query "HostedZones[0].Id" \
   --output text | sed 's|/hostedzone/||')
 
+echo "HOSTED_ZONE_ID: ${HOSTED_ZONE_ID}"  
+
 # get ELB DNS name
 export INGRESS_HOST=$(aws elb describe-load-balancers --profile redhat \
   --query "LoadBalancerDescriptions[0].DNSName" \
   --output text)
+
+echo "INGRESS_HOST: ${INGRESS_HOST}"
 
 # get ELB hosted zone ID
 export ELB_HOSTED_ZONE_ID=$(aws elb describe-load-balancers --profile redhat \
   --query "LoadBalancerDescriptions[0].CanonicalHostedZoneNameID" \
   --output text)
 
-# run playbook to point domain to ELB
-ansible-playbook ansible/playbook.yaml -e "ansible_python_interpreter=/usr/bin/python3.9"
+echo "ELB_HOSTED_ZONE_ID: ${ELB_HOSTED_ZONE_ID}"
 
-# URl should be
-# http://${YOUR_DOMAIN}/productpage
-
-curl -so  -w "%{http_code}\n" http://${YOUR_DOMAIN}/productpage | grep "<title>Simple Bookstore App</title>"
+# run playbook to point domain to ELB (explicit inventory + ansible.cfg reduce warnings)
+export ANSIBLE_CONFIG="${ANSIBLE_CONFIG:-$(dirname "$0")/ansible.cfg}"
+ansible-playbook ansible/playbook.yaml -i "localhost," -e "ansible_python_interpreter=/usr/bin/python3.9"
