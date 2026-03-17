@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: istio-system
+labels:
+  # needed for user workload monitoring
+  openshift.io/user-monitoring: "true"

@@ -1,8 +1,15 @@
-## Rename contexts for east/west clusters
+# Multi-Mesh Demo – Step-by-Step Instructions
 
-# set contect names for each cluster (east/west)
+---
 
-- Log into EAST openshift cluster, then run
+## 1. Rename contexts for east/west clusters
+
+Set context names for each cluster (east and west).
+
+### 1.1 East cluster
+
+Log into the **east** OpenShift cluster, then run:
+
 ```bash
 oc config current-context
 
@@ -11,7 +18,10 @@ oc config rename-context $(oc config current-context) admin-east
 oc config use-context admin-east
 ```
 
-- Log into WEST openshift cluster, then run
+### 1.2 West cluster
+
+Log into the **west** OpenShift cluster, then run:
+
 ```bash
 oc config current-context
 
@@ -20,8 +30,11 @@ oc config rename-context $(oc config current-context) admin-west
 oc config use-context admin-west
 ```
 
-# Ensure `istioctl` is installed (RHEL bastion host)
--  Download the latest istio release
+---
+
+## 2. Ensure `istioctl` is installed (RHEL bastion host)
+
+Download the latest Istio release:
 
 ```bash
 curl -L https://istio.io/downloadIstio | ISTIO_VERSION=1.27.5 sh -
@@ -32,12 +45,13 @@ sudo mv istio-*/bin/istioctl /usr/local/bin/
 # Verify
 istioctl version
 
-# remove download direcrtory
-m -r ./istio-1.27.5
+# Remove download directory
+rm -r ./istio-1.27.5
 ```
 
+---
 
-## Get env settings
+## 3. Get environment settings
 
 ```bash
 source scripts/00-env.sh
@@ -53,19 +67,23 @@ oc --context="${CTX_WEST}" cluster-info
 oc --context="${CTX_WEST}" version
 ```
 
-# Install Operators on both clusters (Note: Cert-Manager might already be installed if using RHDP)
+---
+
+## 4. Install operators on both clusters
+
+**Note:** Cert-Manager might already be installed if using RHDP.
 
 ```bash
 oc --context="${CTX_EAST}" apply -k manifests/operators/
 oc --context="${CTX_WEST}" apply -k manifests/operators/
 ```
 
-**Verify operators are installed (run per context):**
+### 4.1 Verify operators are installed (run per context)
 
-- Check that Subscriptions exist and have an installed CSV:
+Check that Subscriptions exist and have an installed CSV.
 
+Wait until OSSM and Kiali are ready on both clusters (PHASE `Succeeded`):
 
-- Wait until OSSM and Kiali are ready on both clusters (PHASE `Succeeded`):
 ```bash
 for CTX in "${CTX_EAST}" "${CTX_WEST}"; do
   echo "=== $CTX ==="
@@ -74,7 +92,7 @@ for CTX in "${CTX_EAST}" "${CTX_WEST}"; do
 done
 ```
 
-### 6.2 Enable user workload monitoring
+### 4.2 Enable user workload monitoring
 
 OpenShift's built-in Prometheus stack does not scrape user namespaces by default. Enable it on **both** clusters:
 
@@ -87,7 +105,8 @@ done
 
 **Ensure user-workload-monitoring is up and running:**
 
-- Wait for the user workload Prometheus StatefulSet to be rolled out (run per cluster; blocks until ready):
+Wait for the user workload Prometheus StatefulSet to be rolled out (run per cluster; blocks until ready):
+
 ```bash
 oc --context="${CTX_EAST}" rollout status statefulset prometheus-user-workload \
   -n openshift-user-workload-monitoring
@@ -95,7 +114,8 @@ oc --context="${CTX_WEST}" rollout status statefulset prometheus-user-workload \
   -n openshift-user-workload-monitoring
 ```
 
-- Optional: list pods in the user workload monitoring namespace to confirm all are Running:
+**Optional:** List pods in the user workload monitoring namespace to confirm all are Running:
+
 ```bash
 for CTX in "${CTX_EAST}" "${CTX_WEST}"; do
   echo "=== $CTX ==="
@@ -103,9 +123,11 @@ for CTX in "${CTX_EAST}" "${CTX_WEST}"; do
 done
 ```
 
-### Create the shared root CA
+---
 
-This step runs once. The root CA key should be stored in a secrets manager (Vault, AWS Secrets Manager, etc.) after use. Only the cert is distributed to clusters.
+## 5. Create the shared root CA
+
+This step runs **once**. The root CA key should be stored in a secrets manager (Vault, AWS Secrets Manager, etc.) after use. Only the cert is distributed to clusters.
 
 The OpenSSL config is in [`certs/root-ca.conf`](certs/root-ca.conf). Run from the repo root:
 
@@ -119,13 +141,13 @@ openssl x509 -req -days 3650 -signkey root-ca.key \
 cd ..
 ```
 
-### 1.3 Load the root CA into cert-manager
+### 5.1 Load the root CA into cert-manager
 
 The root CA is loaded as a `ClusterIssuer` on each cluster using [`manifests/cert-manager/clusterissuer.yaml`](manifests/cert-manager/clusterissuer.yaml):
 
 ```bash
 for CTX in "${CTX_EAST}" "${CTX_WEST}"; do
- oc --context="${CTX}" create namespace istio-system --dry-run=client -o yaml | \
+  oc --context="${CTX}" create namespace istio-system --dry-run=client -o yaml | \
     oc --context="${CTX}" apply -f -
 
   oc --context="${CTX}" create secret tls root-ca-secret \
@@ -137,16 +159,18 @@ for CTX in "${CTX_EAST}" "${CTX_WEST}"; do
   oc --context="${CTX}" apply -f manifests/cert-manager/clusterissuer.yaml
 done
 ```
-Note the `istio-system` namespace is created at this time as well
 
-### 1.4 Issue intermediate CA certificates
+**Note:** The `istio-system` namespace is created at this time as well.
 
-Apply the per-cluster intermediate CA manifests to istio-system ns. cert-manager will issue a unique intermediate CA for each cluster, both signed by the shared root:
+### 5.2 Issue intermediate CA certificates
+
+Apply the per-cluster intermediate CA manifests to the `istio-system` namespace. cert-manager will issue a unique intermediate CA for each cluster, both signed by the shared root:
 
 ```bash
 oc --context="${CTX_EAST}" apply -f manifests/cert-manager/east-intermediate-ca.yaml
 oc --context="${CTX_WEST}" apply -f manifests/cert-manager/west-intermediate-ca.yaml
 ```
+
 Verify both secrets are populated before continuing:
 
 ```bash
@@ -156,9 +180,11 @@ oc --context="${CTX_WEST}" get secret cacerts -n istio-system
 
 Both must show `kubernetes.io/tls` with a non-empty `ca.crt`.
 
-# Install Istio Resouces
+---
 
-## Istio CNI
+## 6. Install Istio resources
+
+### 6.1 Istio CNI
 
 ```bash
 oc --context="${CTX_EAST}" apply -k manifests/ossm/istio-cni/
@@ -167,11 +193,13 @@ oc --context="${CTX_WEST}" apply -k manifests/ossm/istio-cni/
 oc --context="${CTX_EAST}" rollout status daemonset istio-cni-node -n istio-cni
 oc --context="${CTX_WEST}" rollout status daemonset istio-cni-node -n istio-cni
 ```
-## Istio Control Plane
-- `meshID` is identical across both clusters
-- `clusterName` and `network` are unique per cluster
-- `discoverySelectors` scope istiod to only watch labeled namespaces
-- `defaultServiceExportTo: ["."]` makes all services private by default
+
+### 6.2 Istio control plane
+
+- `meshID` is identical across both clusters.
+- `clusterName` and `network` are unique per cluster.
+- `discoverySelectors` scope istiod to only watch labeled namespaces.
+- `defaultServiceExportTo: ["."]` makes all services private by default.
 
 ```bash
 oc --context="${CTX_EAST}" apply -k manifests/ossm/istio-system/overlays/east
@@ -187,23 +215,24 @@ oc --context="${CTX_WEST}" wait --for=condition=Ready istio/default \
   -n istio-system --timeout=300s
 ```
 
-
-
-Verify istiod has successfully initialized its CA and propagated the root cert configmap to `istio-system`. Gateway pods will fail to start if `istio-ca-root-cert` configmap is absent, because the injected sidecar mounts it as a volume:
+Verify istiod has successfully initialized its CA and propagated the root cert ConfigMap to `istio-system`. Gateway pods will fail to start if the `istio-ca-root-cert` ConfigMap is absent, because the injected sidecar mounts it as a volume:
 
 ```bash
 oc --context="${CTX_EAST}" get configmap istio-ca-root-cert -n istio-system
 oc --context="${CTX_WEST}" get configmap istio-ca-root-cert -n istio-system
 ```
 
-Both must exist before continuing. If either is missing, check that the `cacerts` secret was correctly
+Both must exist before continuing. If either is missing, check that the `cacerts` secret was correctly applied.
 
-### 2.3 Deploy east-west gateways
+### 6.3 Deploy east-west gateways
+
+Using Kustomize overlays (east → `network1`, west → `network2`):
 
 ```bash
-oc --context="${CTX_EAST}" -n istio-system apply -f manifests/ossm/eastwest-gateway/east/
-oc --context="${CTX_WEST}" -n istio-system apply -f manifests/ossm/eastwest-gateway/west/
+oc --context="${CTX_EAST}" apply -k manifests/ossm/eastwest-gateway/overlays/east
+oc --context="${CTX_WEST}" apply -k manifests/ossm/eastwest-gateway/overlays/west
 ```
+
 Wait for the gateway pods to be ready:
 
 ```bash
@@ -226,19 +255,19 @@ export WEST_GW_ADDR=$(oc --context="${CTX_WEST}" get svc istio-eastwestgateway \
 echo "East gateway: ${EAST_GW_ADDR}"
 echo "West gateway: ${WEST_GW_ADDR}"
 ```
-oth must be non-empty before continuing. If either is empty, the `LoadBalancer` service has not yet been assigned an external address — wait a moment and retry. On bare-metal clusters without a cloud load balancer, see the on-prem note in the Prerequisites section.
 
-### 2.4 Expose services through the east-west gateways
+Both must be non-empty before continuing. If either is empty, the `LoadBalancer` service has not yet been assigned an external address — wait a moment and retry. On bare-metal clusters without a cloud load balancer, see the on-prem note in the Prerequisites section.
 
-Apply `cross-network-gateway.yaml` to `istio-system` on both clusters. This instructs each east-west gateway to accept cross-cluster SNI traffic for all `*.local` hosts using mTLS passthrough:
+### 6.4 Expose services through the east-west gateways
 
+Apply `cross-network-gateway` resources to `istio-system` on both clusters. This instructs each east-west gateway to accept cross-cluster SNI traffic for all `*.local` hosts using mTLS passthrough:
 
 ```bash
 oc --context="${CTX_EAST}" -n istio-system apply -f manifests/ossm/eastwest-gateway/common/
 oc --context="${CTX_WEST}" -n istio-system apply -f manifests/ossm/eastwest-gateway/common/
 ```
 
-### 2.5 Enable cross-cluster endpoint discovery
+### 6.5 Enable cross-cluster endpoint discovery
 
 Each istiod needs a kubeconfig to watch the remote cluster's API server and sync endpoint information via EDS:
 
@@ -261,9 +290,9 @@ istioctl --context="${CTX_EAST}" remote-clusters
 istioctl --context="${CTX_WEST}" remote-clusters
 ```
 
-Both should show the remote cluster with status `synced`.
+Both should show the remote cluster with status `synced`. Example output:
 
-```bash
+```
 NAME             SECRET                                            STATUS     ISTIOD
 cluster-east                                                       synced     istiod-7d96c484ff-m2tks
 cluster-west     istio-system/istio-remote-secret-cluster-west     synced     istiod-7d96c484ff-m2tks
@@ -272,12 +301,15 @@ cluster-west                                                       synced     is
 cluster-east     istio-system/istio-remote-secret-cluster-east     synced     istiod-7bdf94b47c-tt5wd
 ```
 
-# Kiali deployment
+---
+
+## 7. Kiali deployment
 
 ```bash
 oc --context="${CTX_EAST}" apply -f manifests/ossm/kiali/
 oc --context="${CTX_WEST}" apply -f manifests/ossm/kiali/
 ```
+
 Wait for Kiali to be ready:
 
 ```bash
@@ -285,22 +317,26 @@ oc --context="${CTX_EAST}" rollout status deployment kiali -n istio-system
 oc --context="${CTX_WEST}" rollout status deployment kiali -n istio-system
 ```
 
-## Bookinfo App
+---
 
-### East cluster deployment
+## 8. Bookinfo app
+
+### 8.1 East cluster deployment
 
 ```bash
 oc --context="${CTX_EAST}" apply -k manifests/bookinfo/app/east
 ```
 
-### West cluster deployment
+### 8.2 West cluster deployment
+
 ```bash
 oc --context="${CTX_WEST}" apply -k manifests/bookinfo/app/west
 ```
 
-### Validate access to website via Gateway 
+### 8.3 Validate access to website via gateway
 
-- get GW address and port
+Get gateway address and port:
+
 ```bash
 export INGRESS_HOST=$(oc --context=admin-east get gtw bookinfo-gw -n bookinfo -o jsonpath='{.status.addresses[0].value}')
 export INGRESS_PORT=$(oc --context=admin-east get gtw bookinfo-gw -n bookinfo -o jsonpath='{.spec.listeners[?(@.name=="http")].port}')
@@ -309,21 +345,22 @@ export GATEWAY_URL=$INGRESS_HOST:$INGRESS_PORT
 echo "http://${GATEWAY_URL}/productpage"
 ```
 
+Verify the productpage:
+
 ```bash
-curl -so  -w "%{http_code}\n" http://${GATEWAY_URL}/productpage | grep "<title>Simple Bookstore App</title>"
+curl -so - -w "%{http_code}\n" http://${GATEWAY_URL}/productpage | grep "<title>Simple Bookstore App</title>"
 ```
 
-
-### Validate access to api via Gateway
+### 8.4 Validate access to API via gateway
 
 ```bash
-curl -so  -w "%{http_code}\n" http://${GATEWAY_URL}/api/v1/products/0/ratings | jq
+curl -so - -w "%{http_code}\n" http://${GATEWAY_URL}/api/v1/products/0/ratings | jq
 ```
 
-### Load genrator scripts for both web and api (can run simultaniously)
+### 8.5 Load generator scripts (web and API; can run simultaneously)
 
 ```bash
-sh scripts/loadgen-web.sh 
+sh scripts/loadgen-web.sh
 
-sh scripts/loadgen-api.sh 
+sh scripts/loadgen-api.sh
 ```

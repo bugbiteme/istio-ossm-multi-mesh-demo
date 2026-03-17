@@ -10,6 +10,9 @@ metadata:
     # needed for multi-cluster
     topology.istio.io/network: network1
 
+    # needed for user workload monitoring
+    openshift.io/user-monitoring: "true"
+
   name: bookinfo
 spec:
   finalizers:

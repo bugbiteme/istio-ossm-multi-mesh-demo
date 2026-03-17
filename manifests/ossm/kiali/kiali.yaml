@@ -31,6 +31,11 @@ spec:
     prometheus:
       # thanos-querier in openshift-monitoring aggregates user workload metrics.
       url: "https://thanos-querier.openshift-monitoring.svc.cluster.local:9091"
+      thanos_proxy:
+        enabled: true
+      query_scope:
+        # mesh_id: mesh1
+        {}
       auth:
         type: bearer
         use_kiali_token: true

@@ -1,0 +1,26 @@
+# Istio control plane base; clusterName and network are set by overlays (east/west).
+apiVersion: sailoperator.io/v1
+kind: Istio
+metadata:
+  name: default
+spec:
+  version: v1.27.5
+  namespace: istio-system
+  values:
+    global:
+      meshID: mesh1
+      multiCluster:
+        clusterName: placeholder
+      network: placeholder
+    meshConfig:
+      discoverySelectors:
+        - matchLabels:
+            istio-injection: enabled
+        - matchLabels:
+            kubernetes.io/metadata.name: istio-system
+      # set defaultServiceExportTo: ["*"] for cross-cluster traffic between different namespaces
+      # set defaultServiceExportTo: ["."] for cross-cluster traffic within the same namespace 
+      defaultServiceExportTo: ["*"]
+      defaultVirtualServiceExportTo: ["."]
+      defaultDestinationRuleExportTo: ["."]
+      trustDomain: cluster.local

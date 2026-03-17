@@ -1,0 +1,10 @@
+apiVersion: sailoperator.io/v1
+kind: Istio
+metadata:
+  name: default
+spec:
+  values:
+    global:
+      multiCluster:
+        clusterName: cluster-west
+      network: network2

@@ -1,0 +1,18 @@
+# Applied to istio-system on both clusters.
+# Instructs the east-west gateway to accept cross-cluster mTLS passthrough traffic.
+apiVersion: networking.istio.io/v1
+kind: Gateway
+metadata:
+  name: cross-network-gateway
+spec:
+  selector:
+    istio: eastwestgateway
+  servers:
+    - port:
+        number: 15443
+        name: tls
+        protocol: TLS
+      tls:
+        mode: AUTO_PASSTHROUGH
+      hosts:
+        - "*.local"

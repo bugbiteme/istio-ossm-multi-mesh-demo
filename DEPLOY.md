@@ -603,6 +603,12 @@ Both should report the remote cluster as `synced: true`.
 ### 7.3 Cross-cluster endpoints visible from travels proxy
 
 ```bash
+RATINGS_POD=$(oc --context="${CTX_EAST}" get pod -n bookinfo \
+  -l app=ratings -o jsonpath='{.items[0].metadata.name}')
+
+istioctl --context="${CTX_EAST}" proxy-config endpoints \
+  ${RATINGS_POD}.bookinfo 
+
 TRAVELS_POD=$(oc --context="${CTX_EAST}" get pod -n travel-agency \
   -l app=travels -o jsonpath='{.items[0].metadata.name}')
 
