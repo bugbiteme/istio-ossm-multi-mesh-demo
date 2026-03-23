@@ -34,9 +34,7 @@ export HOSTED_ZONE_ID=$(aws route53 list-hosted-zones-by-name \
 echo "HOSTED_ZONE_ID: ${HOSTED_ZONE_ID}"  
 
 # get ELB DNS name
-export INGRESS_HOST=$(aws elb describe-load-balancers --profile redhat \
-  --query "LoadBalancerDescriptions[0].DNSName" \
-  --output text)
+export INGRESS_HOST=$(oc --context=admin-east get gtw prod-gateway -n ingress-gateway -o jsonpath='{.status.addresses[0].value}')
 
 echo "INGRESS_HOST: ${INGRESS_HOST}"
 
@@ -48,5 +46,4 @@ export ELB_HOSTED_ZONE_ID=$(aws elb describe-load-balancers --profile redhat \
 echo "ELB_HOSTED_ZONE_ID: ${ELB_HOSTED_ZONE_ID}"
 
 # run playbook to point domain to ELB (explicit inventory + ansible.cfg reduce warnings)
-export ANSIBLE_CONFIG="${ANSIBLE_CONFIG:-$(dirname "$0")/ansible.cfg}"
 ansible-playbook ansible/playbook.yaml -i "localhost," -e "ansible_python_interpreter=/usr/bin/python3.9"
