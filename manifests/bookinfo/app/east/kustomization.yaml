@@ -18,5 +18,5 @@ resources:
   - reviews-v3-deployment.yaml
   - productpage-v1-deployment.yaml
   # Gateway API
-  - bookinfo-gw.yaml
+  # - bookinfo-gw.yaml
   - productpage-httproute.yaml

@@ -18,9 +18,11 @@ spec:
             istio-injection: enabled
         - matchLabels:
             kubernetes.io/metadata.name: istio-system
+        - matchLabels:
+            istio-discovery: enabled
       # set defaultServiceExportTo: ["*"] for cross-cluster traffic between different namespaces
       # set defaultServiceExportTo: ["."] for cross-cluster traffic within the same namespace 
       defaultServiceExportTo: ["*"]
-      defaultVirtualServiceExportTo: ["."]
-      defaultDestinationRuleExportTo: ["."]
+      defaultVirtualServiceExportTo: ["*"]
+      defaultDestinationRuleExportTo: ["*"]
       trustDomain: cluster.local

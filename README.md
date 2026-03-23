@@ -301,6 +301,26 @@ cluster-west                                                       synced     is
 cluster-east     istio-system/istio-remote-secret-cluster-east     synced     istiod-7bdf94b47c-tt5wd
 ```
 
+### 6.6 Ingress Gateway Deployment
+
+This will deploy the ingress gateway (via K8 Gateway API) in the `ingress-gateway` namespace (will create the namespace)
+
+```bash
+oc --context="${CTX_EAST}" apply -f manifests/ingress-gateway/
+```
+
+To check the status and FQDN of the loadbalancer pointed to the GW
+```bash
+oc --context=admin-east get gtw prod-gateway -n ingress-gateway
+```
+
+example output:
+
+```
+NAME           CLASS   ADDRESS                                                                     PROGRAMMED   AGE
+prod-gateway   istio   a27962850ossm15awesomecf13afed-641463735.eu-central-1.elb.amazonaws.com     True         9m12s
+```
+**Note:** If no value is returned, look at the status details of the Gatway resource to see if it is stuck in the `PENDING` state
 ---
 
 ## 7. Kiali deployment
@@ -338,8 +358,8 @@ oc --context="${CTX_WEST}" apply -k manifests/bookinfo/app/west
 Get gateway address and port:
 
 ```bash
-export INGRESS_HOST=$(oc --context=admin-east get gtw bookinfo-gw -n bookinfo -o jsonpath='{.status.addresses[0].value}')
-export INGRESS_PORT=$(oc --context=admin-east get gtw bookinfo-gw -n bookinfo -o jsonpath='{.spec.listeners[?(@.name=="http")].port}')
+export INGRESS_HOST=$(oc --context=admin-east get gtw prod-gateway -n ingress-gateway -o jsonpath='{.status.addresses[0].value}')
+export INGRESS_PORT=$(oc --context=admin-east get gtw prod-gateway -n ingress-gateway -o jsonpath='{.spec.listeners[?(@.name=="http")].port}')
 export GATEWAY_URL=$INGRESS_HOST:$INGRESS_PORT
 
 echo "http://${GATEWAY_URL}/productpage"

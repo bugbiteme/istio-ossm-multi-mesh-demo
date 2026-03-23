@@ -10,8 +10,8 @@ spec:
   parentRefs:
   - group: gateway.networking.k8s.io
     kind: Gateway
-    name: bookinfo-gw
-    namespace: bookinfo
+    name: prod-gateway
+    namespace: ingress-gateway
   rules:
   - matches:
     - path:
