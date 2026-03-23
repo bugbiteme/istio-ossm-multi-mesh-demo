@@ -1,0 +1,17 @@
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+
+  name: control
+  namespace: travel-control
+ 
+spec:
+
+  port:
+    targetPort: http
+  to:
+    kind: Service
+    name: control
+    weight: 100
+  wildcardPolicy: None
+
