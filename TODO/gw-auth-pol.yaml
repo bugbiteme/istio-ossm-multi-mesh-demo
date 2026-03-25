@@ -2,7 +2,7 @@ apiVersion: kuadrant.io/v1
 kind: AuthPolicy
 metadata:
 
-  name: prod-gateway-auth
+  name: deny-all
   namespace: ingress-gateway
  
 spec:

@@ -4,7 +4,7 @@ metadata:
 
   name: deny-all
   namespace: bookinfo
-  resourceVersion: "297187"
+ 
 
 spec:
   rules:
