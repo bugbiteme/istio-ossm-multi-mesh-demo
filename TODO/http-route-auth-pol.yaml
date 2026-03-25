@@ -1,0 +1,32 @@
+apiVersion: kuadrant.io/v1
+kind: AuthPolicy
+metadata:
+
+  name: deny-all
+  namespace: bookinfo
+  resourceVersion: "297187"
+
+spec:
+  rules:
+    authorization:
+      denyAll:
+        metrics: false
+        opa:
+          allValues: false
+          rego: allow = false
+        priority: 0
+    response:
+      unauthorized:
+        body:
+          value: |-
+            {
+              "error": "Forbidden",
+              "message": "Access denied by default. Create a specific auth policy for the route."
+            }
+        headers:
+          content-type:
+            value: application/json
+  targetRef:
+    group: gateway.networking.k8s.io
+    kind: HTTPRoute
+    name: bookinfo
