@@ -23,7 +23,11 @@ spec:
       serviceAccountName: bookinfo-ratings
       containers:
       - name: ratings
-        image: docker.io/istio/examples-bookinfo-ratings-v1:1.20.3
+        # image: docker.io/istio/examples-bookinfo-ratings-v1:1.20.3
+        image: quay.io/llevy/ratings:cluster
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 9080
+        env:
+        - name: CLUSTER
+          value: "CLUSTER-WEST"
