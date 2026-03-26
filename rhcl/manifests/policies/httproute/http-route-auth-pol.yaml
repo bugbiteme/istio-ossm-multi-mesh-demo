@@ -2,7 +2,7 @@ apiVersion: kuadrant.io/v1
 kind: AuthPolicy
 metadata:
 
-  name: deny-all
+  name: allow-all
   namespace: bookinfo
  
 
@@ -13,7 +13,7 @@ spec:
         metrics: false
         opa:
           allValues: false
-          rego: allow = false
+          rego: allow = true
         priority: 0
     response:
       unauthorized:
