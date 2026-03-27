@@ -9,7 +9,7 @@ components:
     container:
       # Universal Developer Image — includes git, curl, kubectl, and common runtimes.
       # Swap for a custom image if you want tools pre-baked (faster cold starts).
-      image: quay.io/devfile/universal-developer-image:ubi8-latest
+      image: quay.io/devfile/universal-developer-image:ubi9-latest
       memoryLimit: 4Gi
       memoryRequest: 512Mi
       cpuLimit: "2"
@@ -26,6 +26,25 @@ components:
         # Ensure $HOME/.local/bin is on PATH so user-installed tools are available
         - name: PATH
           value: "/home/user/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+
+        # Environment Variables needed for setting up and running istio demo (found in scripts/00-export.sh)
+        -  name: CTX_EAST
+           value: "admin-east"
+        -  name: CTX_WEST
+           value: "admin-west"
+        -  name: ISTIO_VERSION
+           value: "1.27.5"
+        -  name: MESH_ID
+           value: "mesh1"
+        -  name: EAST_CLUSTER
+           value: "cluster-east"
+        -  name: WEST_CLUSTER
+           value: "cluster-west"
+        -  name: EAST_NETWORK
+           value: "network1"
+        -  name: WEST_NETWORK
+           value: "network2"
+
 
         # --- Add your environment variables below ---
         # These are set globally in the container at startup (unlike shell exports
