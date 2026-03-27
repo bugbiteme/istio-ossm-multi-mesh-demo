@@ -32,7 +32,7 @@ oc config use-context admin-west
 
 ---
 
-## 2. Ensure `istioctl` is installed (RHEL bastion host)
+## 2. Ensure `istioctl` is installed (RHEL bastion host) (Skip if using Dev Spaces)
 
 Download the latest Istio release:
 
@@ -51,7 +51,7 @@ rm -r ./istio-1.27.5
 
 ---
 
-## 3. Get environment settings
+## 3. Get environment settings (Skip if using Dev Spaces)
 
 ```bash
 source scripts/00-env.sh

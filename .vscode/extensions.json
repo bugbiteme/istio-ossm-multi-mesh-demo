@@ -8,6 +8,7 @@
 
     // OpenShift-specific CR support, resource tree, login/context switching
     "redhat.vscode-openshift-toolkit",
+    "redhat.vscode-openshift-connector",
 
     // Helm IntelliSense (useful if any overlays use Helm charts)
     "tim-koehler.helm-intellisense",
