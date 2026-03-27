@@ -19,7 +19,7 @@ ansible-galaxy collection install amazon.aws
 pip install boto3
 
 # Set your domain before running (e.g. export YOUR_DOMAIN=example.com)
-export YOUR_DOMAIN="leonlevy.lol"
+export YOUR_DOMAIN="${YOUR_DOMAIN:-your-domain.example.com}"
 echo "YOUR_DOMAIN: ${YOUR_DOMAIN}"
 
 # set up AWS access id/key (if you havent already, make sure you have the [default] and [redhat] profiles)
