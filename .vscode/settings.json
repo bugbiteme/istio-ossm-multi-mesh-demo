@@ -1,0 +1,26 @@
+{
+  // Associate Kubernetes schemas with YAML files automatically
+  "yaml.schemas": {
+    "kubernetes": [
+      "*.yaml",
+      "*.yml",
+      // Kustomize-specific files
+      "kustomization.yaml",
+      "kustomization.yml"
+    ]
+  },
+
+  // Highlight schema violations inline
+  "yaml.validate": true,
+
+  // Warn on hover, not just in the Problems panel
+  "yaml.hover": true,
+
+  // Enable autocompletion from schema
+  "yaml.completion": true,
+
+  // If you have custom CRDs, add their schema mappings here:
+  // "yaml.schemas": {
+  //   "./schemas/my-crd-schema.json": "**/*-cr.yaml"
+  // }
+}

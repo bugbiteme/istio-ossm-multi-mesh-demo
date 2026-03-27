@@ -1,0 +1,195 @@
+schemaVersion: 2.2.0
+
+metadata:
+  name: k8s-kustomize-workspace
+  version: 1.0.0
+
+components:
+  - name: tools
+    container:
+      # Universal Developer Image — includes git, curl, kubectl, and common runtimes.
+      # Swap for a custom image if you want tools pre-baked (faster cold starts).
+      image: quay.io/devfile/universal-developer-image:ubi8-latest
+      memoryLimit: 4Gi
+      memoryRequest: 512Mi
+      cpuLimit: "2"
+      cpuRequest: "500m"
+      mountSources: true
+
+      env:
+        # Git identity — used by the configure-git postStart command
+        - name: GIT_USER_EMAIL
+          value: "leon.s.levy@gmail.com"
+        - name: GIT_USER_NAME
+          value: "bugbiteme"
+
+        # Ensure $HOME/.local/bin is on PATH so user-installed tools are available
+        - name: PATH
+          value: "/home/user/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+
+        # --- Add your environment variables below ---
+        # These are set globally in the container at startup (unlike shell exports
+        # in a script, which only live for that session).
+        #
+        # - name: MY_VAR
+        #   value: "my-value"
+        # - name: KUBECONFIG
+        #   value: "/home/user/.kube/config"
+
+      # Expose ports if your app or tooling needs them (uncomment as needed)
+      # endpoints:
+      #   - name: app
+      #     targetPort: 8080
+      #   - name: metrics
+      #     targetPort: 9090
+
+# ---------------------------------------------------------------------------
+# Commands — each can be run manually from the IDE's "Run Task" menu,
+# and the postStart block below wires the install commands to run automatically
+# on every workspace start.
+# ---------------------------------------------------------------------------
+commands:
+
+  # 1. Git identity
+  - id: configure-git
+    exec:
+      label: "Setup: Configure Git identity"
+      component: tools
+      commandLine: |
+        git config --global user.email "${GIT_USER_EMAIL}"
+        git config --global user.name "${GIT_USER_NAME}"
+        echo "✔ Git configured as ${GIT_USER_NAME} <${GIT_USER_EMAIL}>"
+
+  # 2. Source the env script (runs side effects; env vars exported here are
+  #    session-scoped only — declare persistent ones in the env: block above)
+  - id: source-env-script
+    exec:
+      label: "Setup: Source scripts/00-env.sh"
+      component: tools
+      workingDir: ${PROJECT_SOURCE}
+      commandLine: |
+        if [ -f scripts/00-env.sh ]; then
+          sh scripts/00-env.sh
+          echo "✔ scripts/00-env.sh sourced"
+        else
+          echo "⚠ scripts/00-env.sh not found — skipping"
+        fi
+
+  # 3. Node.js 24 + Claude Code
+  #    Installed to the UDI via dnf (requires sudo).
+  #    node/npm themselves live in the system path; only global npm packages go
+  #    to $HOME/.local so they persist across restarts.
+  - id: install-nodejs
+    exec:
+      label: "Setup: Install Node.js 24 + Claude Code"
+      component: tools
+      commandLine: |
+        if ! node --version 2>/dev/null | grep -q "^v24"; then
+          echo "→ Installing Node.js 24..."
+          sudo dnf module install nodejs:24 -y
+        else
+          echo "✔ Node.js $(node --version) already installed"
+        fi
+
+        if ! command -v claude &>/dev/null; then
+          echo "→ Installing @anthropic-ai/claude-code..."
+          npm install -g @anthropic-ai/claude-code --prefix "$HOME/.local"
+        else
+          echo "✔ claude-code already installed"
+        fi
+
+  # 4. istioctl
+  - id: install-istio
+    exec:
+      label: "Setup: Install istioctl 1.27.5"
+      component: tools
+      commandLine: |
+        ISTIO_VERSION="1.27.5"
+        INSTALL_DIR="$HOME/.local/bin"
+        mkdir -p "$INSTALL_DIR"
+
+        if command -v istioctl &>/dev/null; then
+          echo "✔ istioctl $(istioctl version --client --short 2>/dev/null || istioctl version --client) already installed"
+        else
+          echo "→ Installing istioctl ${ISTIO_VERSION}..."
+          curl -sSL https://istio.io/downloadIstio | ISTIO_VERSION="${ISTIO_VERSION}" TARGET_ARCH="$(uname -m)" sh -
+          mv "istio-${ISTIO_VERSION}/bin/istioctl" "$INSTALL_DIR/"
+          rm -rf "istio-${ISTIO_VERSION}"
+          echo "✔ istioctl ${ISTIO_VERSION} installed to ${INSTALL_DIR}"
+        fi
+
+  # 5. kustomize
+  - id: install-kustomize
+    exec:
+      label: "Setup: Install kustomize (latest)"
+      component: tools
+      commandLine: |
+        INSTALL_DIR="$HOME/.local/bin"
+        mkdir -p "$INSTALL_DIR"
+
+        if command -v kustomize &>/dev/null; then
+          echo "✔ $(kustomize version) already installed"
+        else
+          echo "→ Installing kustomize..."
+          # Downloads and places binary in current directory
+          curl -sSL "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash
+          mv kustomize "$INSTALL_DIR/"
+          echo "✔ kustomize installed to ${INSTALL_DIR}"
+        fi
+
+  # 6. Helm
+  - id: install-helm
+    exec:
+      label: "Setup: Install Helm (latest stable)"
+      component: tools
+      commandLine: |
+        INSTALL_DIR="$HOME/.local/bin"
+        mkdir -p "$INSTALL_DIR"
+
+        if command -v helm &>/dev/null; then
+          echo "✔ $(helm version --short) already installed"
+        else
+          echo "→ Installing Helm..."
+          # get-helm-3 respects HELM_INSTALL_DIR if set
+          export HELM_INSTALL_DIR="$INSTALL_DIR"
+          export USE_SUDO="false"
+          curl -sSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+          echo "✔ Helm installed to ${INSTALL_DIR}"
+        fi
+
+  # Convenience: run the full setup in one shot (useful for manual re-runs)
+  - id: full-setup
+    exec:
+      label: "Setup: Run full workspace setup"
+      component: tools
+      workingDir: ${PROJECT_SOURCE}
+      commandLine: |
+        echo "=== Git ===" && \
+        git config --global user.email "${GIT_USER_EMAIL}" && \
+        git config --global user.name "${GIT_USER_NAME}" && \
+        echo "=== Env script ===" && \
+        [ -f scripts/00-env.sh ] && sh scripts/00-env.sh || true && \
+        echo "=== Node.js ===" && \
+        (node --version 2>/dev/null | grep -q "^v24" || sudo dnf module install nodejs:24 -y) && \
+        (command -v claude &>/dev/null || npm install -g @anthropic-ai/claude-code --prefix "$HOME/.local") && \
+        echo "=== istioctl ===" && \
+        (command -v istioctl &>/dev/null || (curl -sSL https://istio.io/downloadIstio | ISTIO_VERSION=1.27.5 sh - && mv istio-1.27.5/bin/istioctl "$HOME/.local/bin/" && rm -rf istio-1.27.5)) && \
+        echo "=== kustomize ===" && \
+        (command -v kustomize &>/dev/null || (curl -sSL https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh | bash && mv kustomize "$HOME/.local/bin/")) && \
+        echo "=== helm ===" && \
+        (command -v helm &>/dev/null || (HELM_INSTALL_DIR="$HOME/.local/bin" USE_SUDO=false curl -sSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash)) && \
+        echo "" && \
+        echo "✔ Workspace setup complete!"
+
+# ---------------------------------------------------------------------------
+# Events — postStart commands run automatically when the workspace starts.
+# They execute sequentially in the order listed.
+# ---------------------------------------------------------------------------
+events:
+  postStart:
+    - configure-git
+    - source-env-script
+    - install-nodejs
+    - install-istio
+    - install-kustomize
+    - install-helm

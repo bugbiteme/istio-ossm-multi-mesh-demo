@@ -1,0 +1,18 @@
+{
+  "recommendations": [
+    // YAML validation + schema support (essential for CR/Kustomize linting)
+    "redhat.vscode-yaml",
+
+    // Kubernetes IntelliSense, CRD-aware validation, kubectl integration
+    "ms-kubernetes-tools.vscode-kubernetes-tools",
+
+    // OpenShift-specific CR support, resource tree, login/context switching
+    "redhat.vscode-openshift-toolkit",
+
+    // Helm IntelliSense (useful if any overlays use Helm charts)
+    "tim-koehler.helm-intellisense",
+
+    // Kubernetes manifest snippets
+    "ipedrazas.kubernetes-snippets"
+  ]
+}
