@@ -37,3 +37,10 @@ spec:
       defaultVirtualServiceExportTo: ["*"]
       defaultDestinationRuleExportTo: ["*"]
       trustDomain: cluster.local
+      # For distributed tracing
+      enableTracing: true
+      extensionProviders:
+      - name: otel
+        opentelemetry:
+          port: 4317
+          service: otel-collector.istio-system.svc.cluster.local

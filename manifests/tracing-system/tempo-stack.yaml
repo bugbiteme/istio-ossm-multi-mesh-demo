@@ -1,0 +1,89 @@
+apiVersion: tempo.grafana.com/v1alpha1
+kind: TempoStack
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: tempo-operator
+    tempo.grafana.com/distribution: openshift
+  name: sample
+  namespace: tracing-system
+spec:
+  hashRing:
+    memberlist: {}
+  images: {}
+  limits:
+    global:
+      ingestion: {}
+      query:
+        maxSearchDuration: 0s
+  managementState: Managed
+  observability:
+    grafana:
+      instanceSelector: {}
+    metrics: {}
+    tracing:
+      jaeger_agent_endpoint: localhost:6831
+      otlp_http_endpoint: http://localhost:4320
+  replicationFactor: 1
+  resources: {}
+  retention:
+    global:
+      traces: 48h0m0s
+  search:
+    defaultResultLimit: 20
+    maxDuration: 0s
+  serviceAccount: tempo-sample
+  storage:
+    secret:
+      name: my-storage-secret
+      type: s3
+    tls:
+      enabled: false
+  storageSize: 1Gi
+  template:
+    compactor:
+      replicas: 1
+    distributor:
+      component:
+        replicas: 1
+      tls:
+        enabled: false
+    gateway:
+      component:
+        replicas: 1
+      enabled: true
+      ingress:
+        route:
+          termination: reencrypt
+        type: route
+      rbac:
+        enabled: false
+    ingester:
+      replicas: 1
+    querier:
+      replicas: 1
+      resources:
+        limits:
+          cpu: "2"
+    queryFrontend:
+      component:
+        replicas: 1
+        resources:
+          limits:
+            memory: 6Gi
+      jaegerQuery:
+        enabled: true
+        ingress:
+          route: {}
+        monitorTab:
+          enabled: false
+          prometheusEndpoint: ""
+        servicesQueryDuration: 72h0m0s
+        tempoQuery: {}
+  tenants:
+    authentication:
+    - tenantId: f78bf974-aee2-47e8-8bb4-9ba41a41824a
+      tenantName: north
+    - tenantId: ac4dd897-40da-4403-9cab-53905e22ef78
+      tenantName: south
+    mode: openshift
+  timeout: 30s

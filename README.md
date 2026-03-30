@@ -181,6 +181,13 @@ oc --context="${CTX_WEST}" get secret cacerts -n istio-system
 Both must show `kubernetes.io/tls` with a non-empty `ca.crt`.
 
 ---
+## (new step). Install Tracing System
+
+```bash
+oc --context="${CTX_EAST}" apply -k manifests/tracing-system/
+oc --context="${CTX_WEST}" apply -k manifests/tracing-system/
+```
+This will install s3 storage (minio), as well as the temo-stack for distributed tracing
 
 ## 6. Install Istio resources
 
@@ -194,6 +201,8 @@ oc --context="${CTX_EAST}" rollout status daemonset istio-cni-node -n istio-cni
 oc --context="${CTX_WEST}" rollout status daemonset istio-cni-node -n istio-cni
 ```
 
+
+
 ### 6.2 Istio control plane
 
 - `meshID` is identical across both clusters.
@@ -205,6 +214,7 @@ oc --context="${CTX_WEST}" rollout status daemonset istio-cni-node -n istio-cni
 oc --context="${CTX_EAST}" apply -k manifests/ossm/istio-system/overlays/east
 oc --context="${CTX_WEST}" apply -k manifests/ossm/istio-system/overlays/west
 ```
+**Note**: This also includes opentelemetry components
 
 Wait for both control planes to be ready:
 

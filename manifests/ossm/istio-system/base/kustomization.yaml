@@ -6,3 +6,4 @@ resources:
   - istio-controlplane.yaml
   - istio-service-monitors.yaml
   - istio-system-telemetry.yaml
+  - otel.yaml
