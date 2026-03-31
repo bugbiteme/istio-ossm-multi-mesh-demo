@@ -335,6 +335,17 @@ prod-gateway   istio   a27962850ossm15awesomecf13afed-641463735.eu-central-1.elb
 
 ## 7. Kiali deployment
 
+create a new `cacert` secret in `istio-system` using `ca.crt` as the key from `tracing-system`
+
+```bash
+oc --context="${CTX_EAST}" get secret tempo-sample-signing-ca -n tracing-system \
+    -o jsonpath='{.data.tls\.crt}' | base64 -d > certs/ca.crt 
+oc --context="${CTX_EAST}" create secret generic cacert --from-file=ca.crt=certs/ca.crt -n istio-system    
+```
+(do the same for west)
+
+Apply the kiali CR
+
 ```bash
 oc --context="${CTX_EAST}" apply -f manifests/ossm/kiali/
 oc --context="${CTX_WEST}" apply -f manifests/ossm/kiali/

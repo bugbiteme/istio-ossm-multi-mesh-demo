@@ -5,3 +5,4 @@ resources:
   - namespace.yaml
   - minio.yaml
   - tempo-stack.yaml
+  - tracing-ui-plugin.yaml

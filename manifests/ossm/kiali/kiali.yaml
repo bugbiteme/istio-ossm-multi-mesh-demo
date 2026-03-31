@@ -16,14 +16,31 @@ spec:
   istio_namespace: istio-system
 
   auth:
-    strategy: openshift   # integrates with OpenShift OAuth; use "anonymous" for quick testing
+    strategy: openshift   
 
   deployment:
     # Accessible namespaces drives the namespace list in the UI.
     # "**" means all namespaces the Kiali SA can see.
     # Restrict to specific namespaces in production.
     accessible_namespaces:
-      - "**"
+    - "**"
+    cluster_wide_access: true
+
+    custom_secrets:
+    - mount: /kiali-trace-cert
+      name: cacert
+      optional: false
+
+    logger:
+      log_level: info
+    
+    namespace: istio-system
+    
+    pod_labels:
+      sidecar.istio.io/inject: "false"
+
+    view_only_mode: false
+
     ingress:
       enabled: true
 
@@ -54,4 +71,17 @@ spec:
       enabled: false   # set to true and add url if you deploy Grafana
 
     tracing:
-      enabled: false   # set to true and add url if you deploy Jaeger/Tempo
+      auth:
+        ca_file: /kiali-trace-cert/ca.crt
+        insecure_skip_verify: false
+        type: bearer
+        use_kiali_token: true
+      enabled: true
+      # external_url: https://tempo-sample-gateway-tracing-system.apps.ocp4.example.com/api/traces/v1/north/search
+      # health_check_url: https://tempo-sample-gateway-tracing-system.apps.ocp4.example.com/api/traces/v1/north/tempo/api/echo
+      internal_url: https://tempo-sample-gateway.tracing-system.svc.cluster.local:8080/api/traces/v1/north/tempo
+      provider: tempo
+      query_timeout: 60
+      tempo_config:
+        url_format: jaeger
+      use_grpc: false
