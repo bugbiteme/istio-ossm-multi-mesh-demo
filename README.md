@@ -181,7 +181,7 @@ oc --context="${CTX_WEST}" get secret cacerts -n istio-system
 Both must show `kubernetes.io/tls` with a non-empty `ca.crt`.
 
 ---
-## (new step). Install Tracing System
+## Install Tracing System
 
 ```bash
 oc --context="${CTX_EAST}" apply -k manifests/tracing-system/
@@ -189,6 +189,12 @@ oc --context="${CTX_WEST}" apply -k manifests/tracing-system/
 ```
 This will install s3 storage (minio), as well as the temo-stack for distributed tracing
 
+wait/verify step after applying — Tempo takes time to provision
+
+```bash
+oc --context="${CTX_EAST}" wait --for=condition=Ready tempostack/sample -n tracing-system --timeout=300s                                                                                                                           
+oc --context="${CTX_WEST}" wait --for=condition=Ready tempostack/sample -n tracing-system --timeout=300s  
+```     
 ## 6. Install Istio resources
 
 ### 6.1 Istio CNI
@@ -208,7 +214,6 @@ oc --context="${CTX_WEST}" rollout status daemonset istio-cni-node -n istio-cni
 - `meshID` is identical across both clusters.
 - `clusterName` and `network` are unique per cluster.
 - `discoverySelectors` scope istiod to only watch labeled namespaces.
-- `defaultServiceExportTo: ["."]` makes all services private by default.
 
 ```bash
 oc --context="${CTX_EAST}" apply -k manifests/ossm/istio-system/overlays/east
@@ -336,6 +341,8 @@ prod-gateway   istio   a27962850ossm15awesomecf13afed-641463735.eu-central-1.elb
 ## 7. Kiali deployment
 
 create a new `cacert` secret in `istio-system` using `ca.crt` as the key from `tracing-system`
+**Note** `cacert` must be created before applying the Kiali CR. `tempo-sample-signing-ca` must exist first (i.e., `tracing-system` must be  
+  deployed and Tempo must be ready)
 
 ```bash
 oc --context="${CTX_EAST}" get secret tempo-sample-signing-ca -n tracing-system \
