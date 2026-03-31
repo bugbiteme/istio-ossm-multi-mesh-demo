@@ -5,6 +5,6 @@ resources:
   - ossm.yaml
   - kiali.yaml
   - cert-manager.yaml
-  - cluster-observability-operator.yaml
+  - coo.yaml
   - otel.yaml
   - tempo.yaml

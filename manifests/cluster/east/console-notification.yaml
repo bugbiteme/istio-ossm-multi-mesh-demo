@@ -1,0 +1,13 @@
+apiVersion: console.openshift.io/v1
+kind: ConsoleNotification
+metadata:
+  name: cluster-identity
+spec:
+  text: "Cluster East — Production | EU-West-1"
+  location: BannerTop
+  color: "#FFFFFF"
+  # RED
+  backgroundColor: "#EE0000"
+  # #008000 — web/HTML green
+  # #3E8635 — Red Hat success green
+  

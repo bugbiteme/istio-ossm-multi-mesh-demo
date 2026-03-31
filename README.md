@@ -18,6 +18,12 @@ oc config rename-context $(oc config current-context) admin-east
 oc config use-context admin-east
 ```
 
+Optional banner to identify web console (can be customized first)
+
+```bash
+oc apply -f manifests/cluster/east/console-notification.yaml 
+```
+
 ### 1.2 West cluster
 
 Log into the **west** OpenShift cluster, then run:
@@ -30,6 +36,11 @@ oc config rename-context $(oc config current-context) admin-west
 oc config use-context admin-west
 ```
 
+Optional banner to identify web console (can be customized first)
+
+```bash
+oc apply -f manifests/cluster/west/console-notification.yaml 
+```
 ---
 
 ## 2. Ensure `istioctl` is installed (RHEL bastion host) (Skip if using Dev Spaces)
