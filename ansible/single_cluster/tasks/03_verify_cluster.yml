@@ -1,0 +1,24 @@
+---
+# Step 3: Verify connectivity to the cluster
+
+- name: "[3] Verify cluster is reachable"
+  ansible.builtin.command: "oc --context={{ ctx_east }} cluster-info"
+  register: cluster_info
+  changed_when: false
+  tags: [step3]
+
+- name: "[3] Show cluster info"
+  ansible.builtin.debug:
+    msg: "{{ cluster_info.stdout_lines }}"
+  tags: [step3]
+
+- name: "[3] Show cluster version"
+  ansible.builtin.command: "oc --context={{ ctx_east }} version"
+  register: cluster_version
+  changed_when: false
+  tags: [step3]
+
+- name: "[3] Show cluster version output"
+  ansible.builtin.debug:
+    msg: "{{ cluster_version.stdout_lines }}"
+  tags: [step3]

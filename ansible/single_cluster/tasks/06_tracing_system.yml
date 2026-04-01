@@ -1,0 +1,15 @@
+---
+# Step 6: Install the tracing system (MinIO + Tempo stack)
+
+- name: "[6] Apply tracing-system kustomization"
+  ansible.builtin.command: >
+    oc --context="{{ ctx_east }}" apply -k {{ repo_root }}/manifests/tracing-system/
+  changed_when: true
+  tags: [step6]
+
+- name: "[6] Wait for TempoStack to be ready – up to 5 minutes"
+  ansible.builtin.command: >
+    oc --context="{{ ctx_east }}" wait --for=condition=Ready
+    tempostack/sample -n tracing-system --timeout=300s
+  changed_when: false
+  tags: [step6]

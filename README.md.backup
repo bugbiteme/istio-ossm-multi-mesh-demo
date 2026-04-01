@@ -18,7 +18,7 @@ oc config rename-context $(oc config current-context) admin-east
 oc config use-context admin-east
 ```
 
-Optional banner to identify web console (can be customized first):
+Optional banner to identify web console (can be customized first)
 
 ```bash
 oc apply -f manifests/cluster/east/console-notification.yaml 
@@ -36,12 +36,11 @@ oc config rename-context $(oc config current-context) admin-west
 oc config use-context admin-west
 ```
 
-Optional banner to identify web console (can be customized first):
+Optional banner to identify web console (can be customized first)
 
 ```bash
 oc apply -f manifests/cluster/west/console-notification.yaml 
 ```
-
 ---
 
 ## 2. Ensure `istioctl` is installed (RHEL bastion host) (Skip if using Dev Spaces)
@@ -115,7 +114,7 @@ for CTX in "${CTX_EAST}" "${CTX_WEST}"; do
 done
 ```
 
-**Ensure user workload monitoring is up and running:**
+**Ensure user-workload-monitoring is up and running:**
 
 Wait for the user workload Prometheus StatefulSet to be rolled out (run per cluster; blocks until ready):
 
@@ -193,28 +192,23 @@ oc --context="${CTX_WEST}" get secret cacerts -n istio-system
 Both must show `kubernetes.io/tls` with a non-empty `ca.crt`.
 
 ---
-
-## 6. Install tracing system
+## Install Tracing System
 
 ```bash
 oc --context="${CTX_EAST}" apply -k manifests/tracing-system/
 oc --context="${CTX_WEST}" apply -k manifests/tracing-system/
 ```
+This will install s3 storage (minio), as well as the temo-stack for distributed tracing
 
-This will install S3 storage (MinIO) as well as the Tempo stack for distributed tracing.
-
-Wait for the Tempo stack to be ready on both clusters (Tempo takes time to provision; errors are expected until it stabilizes):
+wait/verify step after applying — Tempo takes time to provision (you will see errors until things stablize)
 
 ```bash
-oc --context="${CTX_EAST}" wait --for=condition=Ready tempostack/sample -n tracing-system --timeout=300s
-oc --context="${CTX_WEST}" wait --for=condition=Ready tempostack/sample -n tracing-system --timeout=300s
-```
+oc --context="${CTX_EAST}" wait --for=condition=Ready tempostack/sample -n tracing-system --timeout=300s                                                                                                                           
+oc --context="${CTX_WEST}" wait --for=condition=Ready tempostack/sample -n tracing-system --timeout=300s  
+```     
+## 6. Install Istio resources
 
----
-
-## 7. Install Istio resources
-
-### 7.1 Istio CNI
+### 6.1 Istio CNI
 
 ```bash
 oc --context="${CTX_EAST}" apply -k manifests/ossm/istio-cni/
@@ -224,7 +218,9 @@ oc --context="${CTX_EAST}" rollout status daemonset istio-cni-node -n istio-cni
 oc --context="${CTX_WEST}" rollout status daemonset istio-cni-node -n istio-cni
 ```
 
-### 7.2 Istio control plane
+
+
+### 6.2 Istio control plane
 
 - `meshID` is identical across both clusters.
 - `clusterName` and `network` are unique per cluster.
@@ -234,8 +230,7 @@ oc --context="${CTX_WEST}" rollout status daemonset istio-cni-node -n istio-cni
 oc --context="${CTX_EAST}" apply -k manifests/ossm/istio-system/overlays/east
 oc --context="${CTX_WEST}" apply -k manifests/ossm/istio-system/overlays/west
 ```
-
-**Note:** This also includes OpenTelemetry components.
+**Note**: This also includes opentelemetry components
 
 Wait for both control planes to be ready:
 
@@ -255,7 +250,7 @@ oc --context="${CTX_WEST}" get configmap istio-ca-root-cert -n istio-system
 
 Both must exist before continuing. If either is missing, check that the `cacerts` secret was correctly applied.
 
-### 7.3 Deploy east-west gateways
+### 6.3 Deploy east-west gateways
 
 Using Kustomize overlays (east → `network1`, west → `network2`):
 
@@ -287,9 +282,9 @@ echo "East gateway: ${EAST_GW_ADDR}"
 echo "West gateway: ${WEST_GW_ADDR}"
 ```
 
-Both must be non-empty before continuing. If either is empty, the `LoadBalancer` service has not yet been assigned an external address — wait a moment and retry.
+Both must be non-empty before continuing. If either is empty, the `LoadBalancer` service has not yet been assigned an external address — wait a moment and retry. 
 
-### 7.4 Expose services through the east-west gateways
+### 6.4 Expose services through the east-west gateways
 
 Apply `cross-network-gateway` resources to `istio-system` on both clusters. This instructs each east-west gateway to accept cross-cluster SNI traffic for all `*.local` hosts using mTLS passthrough:
 
@@ -298,7 +293,7 @@ oc --context="${CTX_EAST}" -n istio-system apply -f manifests/ossm/eastwest-gate
 oc --context="${CTX_WEST}" -n istio-system apply -f manifests/ossm/eastwest-gateway/common/
 ```
 
-### 7.5 Enable cross-cluster endpoint discovery
+### 6.5 Enable cross-cluster endpoint discovery
 
 Each istiod needs a kubeconfig to watch the remote cluster's API server and sync endpoint information via EDS:
 
@@ -332,54 +327,42 @@ cluster-west                                                       synced     is
 cluster-east     istio-system/istio-remote-secret-cluster-east     synced     istiod-7bdf94b47c-tt5wd
 ```
 
-### 7.6 Ingress gateway deployment
+### 6.6 Ingress Gateway Deployment
 
-Deploy the ingress gateway (via Kubernetes Gateway API) in the `ingress-gateway` namespace (namespace will be created automatically):
+This will deploy the ingress gateway (via K8 Gateway API) in the `ingress-gateway` namespace (will create the namespace)
 
 ```bash
 oc --context="${CTX_EAST}" apply -f manifests/ingress-gateway/
 ```
 
-Check the status and FQDN of the load balancer pointed to the gateway:
-
+To check the status and FQDN of the loadbalancer pointed to the GW
 ```bash
 oc --context=admin-east get gtw prod-gateway -n ingress-gateway
 ```
 
-Example output:
+example output:
 
 ```
 NAME           CLASS   ADDRESS                                                                     PROGRAMMED   AGE
 prod-gateway   istio   a27962850ossm15awesomecf13afed-641463735.eu-central-1.elb.amazonaws.com     True         9m12s
 ```
-
-**Note:** If no value is returned, check the status details of the Gateway resource to see if it is stuck in the `PENDING` state.
-
+**Note:** If no value is returned, look at the status details of the Gatway resource to see if it is stuck in the `PENDING` state
 ---
 
-## 8. Kiali deployment
+## 7. Kiali deployment
 
-Create a new `cacert` secret in `istio-system` using `ca.crt` from the `tracing-system` namespace.
-
-**Note:** `cacert` must be created before applying the Kiali CR. The `tempo-sample-signing-ca` secret must exist first (i.e., `tracing-system` must be deployed and Tempo must be ready).
-
-Run on the **east** cluster:
+create a new `cacert` secret in `istio-system` using `ca.crt` as the key from `tracing-system`
+**Note** `cacert` must be created before applying the Kiali CR. `tempo-sample-signing-ca` must exist first (i.e., `tracing-system` must be  
+  deployed and Tempo must be ready)
 
 ```bash
 oc --context="${CTX_EAST}" get secret tempo-sample-signing-ca -n tracing-system \
     -o jsonpath='{.data.tls\.crt}' | base64 -d > certs/ca.crt 
 oc --context="${CTX_EAST}" create secret generic cacert --from-file=ca.crt=certs/ca.crt -n istio-system    
 ```
+(do the same for west)
 
-Run the same commands on the **west** cluster:
-
-```bash
-oc --context="${CTX_WEST}" get secret tempo-sample-signing-ca -n tracing-system \
-    -o jsonpath='{.data.tls\.crt}' | base64 -d > certs/ca.crt 
-oc --context="${CTX_WEST}" create secret generic cacert --from-file=ca.crt=certs/ca.crt -n istio-system    
-```
-
-Apply the Kiali CR:
+Apply the kiali CR
 
 ```bash
 oc --context="${CTX_EAST}" apply -f manifests/ossm/kiali/
@@ -395,21 +378,21 @@ oc --context="${CTX_WEST}" rollout status deployment kiali -n istio-system
 
 ---
 
-## 9. Bookinfo app
+## 8. Bookinfo app
 
-### 9.1 East cluster deployment
+### 8.1 East cluster deployment
 
 ```bash
 oc --context="${CTX_EAST}" apply -k manifests/bookinfo/app/east
 ```
 
-### 9.2 West cluster deployment
+### 8.2 West cluster deployment
 
 ```bash
 oc --context="${CTX_WEST}" apply -k manifests/bookinfo/app/west
 ```
 
-### 9.3 Validate access to website via gateway
+### 8.3 Validate access to website via gateway
 
 Get gateway address and port:
 
@@ -427,25 +410,24 @@ Verify the productpage:
 curl -so - -w "%{http_code}\n" http://${GATEWAY_URL}/productpage | grep "<title>Simple Bookstore App</title>"
 ```
 
-### 9.4 Validate access to API via gateway
+### 8.4 Validate access to API via gateway
 
 ```bash
 curl -so - -w "%{http_code}\n" http://${GATEWAY_URL}/api/v1/products/0/ratings | jq
 ```
 
-### 9.5 Load generator scripts (web and API; can run simultaneously)
+### 8.5 Load generator scripts (web and API; can run simultaneously)
 
 ```bash
 sh scripts/loadgen-web.sh
 
 sh scripts/loadgen-api.sh
 ```
+Give it a moment to start populating data in Kiali
 
-Allow a moment for data to start populating in Kiali.
+### 8.6 Service Mesh Testing (Chaos Engineering)
 
-### 9.6 Service mesh testing (chaos engineering)
-
-#### 9.6.1 Fault injection (east cluster `ratings`)
+### 8.6.1 Fault injection (east cluster `ratings`)
 
 To inject a fault (75% return of HTTP status `503`), apply the Envoy filter to `ratings`:
 
@@ -461,7 +443,7 @@ Once applied, Kiali will start showing errors after a minute. The output from `s
 }
 ```
 
-#### 9.6.2 Retry
+### 8.6.2 Retry
 
 Apply a `VirtualService` to `ratings` to add a retry policy:
 
@@ -478,7 +460,7 @@ oc --context="${CTX_EAST}" -n bookinfo apply -f manifests/bookinfo/ratings-vs.ya
 
 The load generator output will stop showing the error message. When observing traffic in Kiali, the transaction rate will be lower on the `ratings` service in **cluster-east** than on the healthy `ratings` service in **cluster-west**.
 
-#### 9.6.3 Circuit breaker
+### 8.6.3 Circuit breaker
 
 For outlier detection and temporarily removing a service from the load-balancing pool, apply a `DestinationRule` with a circuit breaker:
 
@@ -499,4 +481,4 @@ If one 5xx error is detected in a 10s interval, the pod is ejected for 30s befor
 oc --context="${CTX_EAST}" -n bookinfo apply -f manifests/bookinfo/ratings-dr.yaml
 ```
 
-After applying, `ratings` on **cluster-east** will periodically disappear in Kiali while traffic is diverted to the healthy `ratings` service on **cluster-west**.
+After applying, `ratings` on **cluster-east** will periodically disappear in Kiali while traffic is diverted to the healthy `ratings` service on **cluster-west**. 

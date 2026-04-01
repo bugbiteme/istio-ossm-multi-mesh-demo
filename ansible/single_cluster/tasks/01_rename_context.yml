@@ -1,0 +1,36 @@
+---
+# Step 1: Rename the cluster context
+# Pre-requisite: log into the OpenShift cluster with `oc login` before running this step.
+
+- name: "[1] Check whether context {{ ctx_east }} already exists"
+  ansible.builtin.command: oc config get-contexts {{ ctx_east }}
+  register: ctx_check
+  failed_when: false
+  changed_when: false
+  tags: [step1]
+
+- name: "[1] Get current context to rename"
+  ansible.builtin.command: oc config current-context
+  register: current_ctx
+  changed_when: false
+  when: ctx_check.rc != 0
+  tags: [step1]
+
+- name: "[1] Rename current context to {{ ctx_east }}"
+  ansible.builtin.command: "oc config rename-context {{ current_ctx.stdout | trim }} {{ ctx_east }}"
+  when: ctx_check.rc != 0
+  changed_when: true
+  tags: [step1]
+
+- name: "[1] Switch active context to {{ ctx_east }}"
+  ansible.builtin.command: "oc config use-context {{ ctx_east }}"
+  changed_when: true
+  tags: [step1]
+
+- name: "[1] Apply console notification banner (optional)"
+  ansible.builtin.command: >
+    oc --context="{{ ctx_east }}"
+    apply -f {{ repo_root }}/manifests/cluster/east/console-notification.yaml
+  when: apply_console_notifications | bool
+  changed_when: true
+  tags: [step1]

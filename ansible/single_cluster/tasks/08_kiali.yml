@@ -1,0 +1,31 @@
+---
+# Step 8: Kiali deployment
+
+- name: "[8] Extract Tempo signing CA certificate"
+  ansible.builtin.shell: |
+    oc --context="{{ ctx_east }}" get secret tempo-sample-signing-ca \
+      -n tracing-system \
+      -o jsonpath='{.data.tls\.crt}' | base64 -d > {{ repo_root }}/certs/ca.crt
+  changed_when: true
+  tags: [step8]
+
+- name: "[8] Create cacert secret in istio-system"
+  ansible.builtin.shell: |
+    oc --context="{{ ctx_east }}" create secret generic cacert \
+      --from-file=ca.crt={{ repo_root }}/certs/ca.crt \
+      -n istio-system \
+      --dry-run=client -o yaml | oc --context="{{ ctx_east }}" apply -f -
+  changed_when: true
+  tags: [step8]
+
+- name: "[8] Apply Kiali CR"
+  ansible.builtin.command: >
+    oc --context="{{ ctx_east }}" apply -f {{ repo_root }}/manifests/ossm/kiali/
+  changed_when: true
+  tags: [step8]
+
+- name: "[8] Wait for Kiali deployment to be ready"
+  ansible.builtin.command: >
+    oc --context="{{ ctx_east }}" rollout status deployment kiali -n istio-system
+  changed_when: false
+  tags: [step8]

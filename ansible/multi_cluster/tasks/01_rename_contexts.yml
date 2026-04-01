@@ -1,0 +1,84 @@
+---
+# Step 1: Rename contexts for east/west clusters
+# Pre-requisite: log into each cluster with `oc login` before running this step.
+
+# --- 1.1 East cluster ---
+
+- name: "[1.1] Check whether east context already exists"
+  ansible.builtin.command: oc config get-contexts {{ ctx_east }}
+  register: east_ctx_check
+  failed_when: false
+  changed_when: false
+  tags: [step1]
+
+- name: "[1.1] Get current context to rename (east)"
+  ansible.builtin.command: oc config current-context
+  register: current_ctx_east
+  changed_when: false
+  when: east_ctx_check.rc != 0
+  tags: [step1]
+
+- name: "[1.1] Rename current context to {{ ctx_east }}"
+  ansible.builtin.command: "oc config rename-context {{ current_ctx_east.stdout | trim }} {{ ctx_east }}"
+  when: east_ctx_check.rc != 0
+  changed_when: true
+  tags: [step1]
+
+- name: "[1.1] Switch active context to {{ ctx_east }}"
+  ansible.builtin.command: "oc config use-context {{ ctx_east }}"
+  changed_when: true
+  tags: [step1]
+
+- name: "[1.1] Apply east console notification banner (optional)"
+  ansible.builtin.command: >
+    oc --context="{{ ctx_east }}"
+    apply -f {{ repo_root }}/manifests/cluster/east/console-notification.yaml
+  when: apply_console_notifications | bool
+  changed_when: true
+  tags: [step1]
+
+# --- 1.2 West cluster ---
+
+- name: "[1.2] Pause – log into the west cluster before continuing"
+  ansible.builtin.pause:
+    prompt: |
+
+      ACTION REQUIRED
+      ---------------
+      Log into the WEST OpenShift cluster now (oc login ...).
+      The current context will be renamed to '{{ ctx_west }}'.
+      Press Enter when ready.
+  tags: [step1]
+
+- name: "[1.2] Check whether west context already exists"
+  ansible.builtin.command: oc config get-contexts {{ ctx_west }}
+  register: west_ctx_check
+  failed_when: false
+  changed_when: false
+  tags: [step1]
+
+- name: "[1.2] Get current context to rename (west)"
+  ansible.builtin.command: oc config current-context
+  register: current_ctx_west
+  changed_when: false
+  when: west_ctx_check.rc != 0
+  tags: [step1]
+
+- name: "[1.2] Rename current context to {{ ctx_west }}"
+  ansible.builtin.command: "oc config rename-context {{ current_ctx_west.stdout | trim }} {{ ctx_west }}"
+  when: west_ctx_check.rc != 0
+  changed_when: true
+  tags: [step1]
+
+- name: "[1.2] Switch active context to {{ ctx_west }}"
+  ansible.builtin.command: "oc config use-context {{ ctx_west }}"
+  changed_when: true
+  tags: [step1]
+
+- name: "[1.2] Apply west console notification banner (optional)"
+  ansible.builtin.command: >
+    oc --context="{{ ctx_west }}"
+    apply -f {{ repo_root }}/manifests/cluster/west/console-notification.yaml
+  when: apply_console_notifications | bool
+  changed_when: true
+  tags: [step1]

@@ -1,0 +1,24 @@
+---
+# Cluster contexts – must match the names set in step 1
+ctx_east: admin-east
+ctx_west: admin-west
+
+# Cluster names used when creating remote secrets
+east_cluster: cluster-east
+west_cluster: cluster-west
+
+# Network names used in the Istio control-plane overlay
+east_network: network1
+west_network: network2
+
+# Shared mesh ID (identical on both clusters)
+mesh_id: mesh1
+
+# Istio version for istioctl download
+istio_version: "1.27.5"
+
+# Repository root – two directory levels above this playbook
+repo_root: "{{ playbook_dir | dirname | dirname }}"
+
+# Set to true to apply optional web-console notification banners
+apply_console_notifications: false

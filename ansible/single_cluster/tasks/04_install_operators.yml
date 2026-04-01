@@ -1,0 +1,61 @@
+---
+# Step 4: Install operators and enable user workload monitoring
+
+# --- 4.0 Install operators ---
+
+- name: "[4] Apply operators kustomization"
+  ansible.builtin.command: >
+    oc --context="{{ ctx_east }}" apply -k {{ repo_root }}/manifests/operators/
+  changed_when: true
+  tags: [step4]
+
+# --- 4.1 Verify operators reach Succeeded phase ---
+
+- name: "[4.1] Check current CSV phases"
+  ansible.builtin.shell: |
+    oc --context="{{ ctx_east }}" get csv -n openshift-operators \
+      -o jsonpath='{.items[*].status.phase}' | tr ' ' '\n' | sort -u
+  register: csv_phases_pre
+  changed_when: false
+  tags: [step4]
+
+- name: "[4.1] Wait for CSVs to reach Succeeded"
+  ansible.builtin.shell: |
+    oc --context="{{ ctx_east }}" get csv -n openshift-operators \
+      -o jsonpath='{.items[*].status.phase}' | tr ' ' '\n' | sort -u
+  register: csv_phases
+  until: >-
+    csv_phases.stdout | length > 0 and
+    'Installing' not in csv_phases.stdout and
+    'Pending' not in csv_phases.stdout
+  retries: 30
+  delay: 20
+  changed_when: false
+  when: >-
+    csv_phases_pre.stdout | length == 0 or
+    'Installing' in csv_phases_pre.stdout or
+    'Pending' in csv_phases_pre.stdout
+  tags: [step4]
+
+- name: "[4.1] Show CSV phases"
+  ansible.builtin.command: >
+    oc --context="{{ ctx_east }}" get csv -n openshift-operators
+    -o custom-columns=NAME:.metadata.name,PHASE:.status.phase
+  changed_when: false
+  tags: [step4]
+
+# --- 4.2 Enable user workload monitoring ---
+
+- name: "[4.2] Enable user workload monitoring"
+  ansible.builtin.command: >
+    oc --context="{{ ctx_east }}" apply
+    -f {{ repo_root }}/manifests/monitoring/user-workload-monitoring.yaml
+  changed_when: true
+  tags: [step4]
+
+- name: "[4.2] Wait for prometheus-user-workload rollout"
+  ansible.builtin.command: >
+    oc --context="{{ ctx_east }}" rollout status statefulset prometheus-user-workload
+    -n openshift-user-workload-monitoring --timeout=180s
+  changed_when: false
+  tags: [step4]

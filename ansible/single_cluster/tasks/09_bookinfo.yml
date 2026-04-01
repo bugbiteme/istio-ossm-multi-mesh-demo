@@ -1,0 +1,96 @@
+---
+# Step 9: Deploy the Bookinfo app and validate access
+
+# --- 9.1 Deploy app ---
+
+- name: "[9.1] Deploy Bookinfo app"
+  ansible.builtin.command: >
+    oc --context="{{ ctx_east }}" apply -k {{ repo_root }}/manifests/bookinfo/app/east
+  changed_when: true
+  tags: [step9]
+
+# --- 9.2 Collect gateway URL ---
+
+- name: "[9.2] Get ingress gateway host"
+  ansible.builtin.command: >
+    oc --context="{{ ctx_east }}" get gtw prod-gateway -n ingress-gateway
+    -o jsonpath='{.status.addresses[0].value}'
+  register: ingress_host
+  until: ingress_host.stdout | length > 0
+  retries: 10
+  delay: 10
+  changed_when: false
+  tags: [step9]
+
+- name: "[9.2] Get ingress gateway HTTP port"
+  ansible.builtin.command: >
+    oc --context="{{ ctx_east }}" get gtw prod-gateway -n ingress-gateway
+    -o jsonpath='{.spec.listeners[?(@.name=="http")].port}'
+  register: ingress_port
+  changed_when: false
+  tags: [step9]
+
+- name: "[9.2] Set gateway URL fact"
+  ansible.builtin.set_fact:
+    gateway_url: "{{ ingress_host.stdout | trim }}:{{ ingress_port.stdout | trim }}"
+  tags: [step9]
+
+- name: "[9.2] Show productpage URL"
+  ansible.builtin.debug:
+    msg: "Productpage URL: http://{{ gateway_url }}/productpage"
+  tags: [step9]
+
+# --- 9.3 Verify productpage ---
+
+- name: "[9.3] Verify productpage returns the expected title"
+  ansible.builtin.uri:
+    url: "http://{{ gateway_url }}/productpage"
+    return_content: true
+  register: productpage_response
+  until: "'Simple Bookstore App' in productpage_response.content"
+  retries: 10
+  delay: 15
+  tags: [step9]
+
+- name: "[9.3] Confirm productpage is reachable"
+  ansible.builtin.debug:
+    msg: "Productpage responded with HTTP {{ productpage_response.status }}"
+  tags: [step9]
+
+# --- 9.4 Verify ratings API ---
+
+- name: "[9.4] Verify ratings API endpoint"
+  ansible.builtin.uri:
+    url: "http://{{ gateway_url }}/api/v1/products/0/ratings"
+    return_content: true
+    status_code: [200, 503]
+  register: ratings_response
+  tags: [step9]
+
+- name: "[9.4] Show ratings API response"
+  ansible.builtin.debug:
+    msg: "Ratings API HTTP status: {{ ratings_response.status }}"
+  tags: [step9]
+
+# --- 9.5 Load generators (optional) ---
+
+- name: "[9.5] Start web load generator in background (optional)"
+  ansible.builtin.shell: "nohup sh {{ repo_root }}/scripts/loadgen-web.sh &"
+  when: start_load_generators | default(false) | bool
+  changed_when: true
+  tags: [step9]
+
+- name: "[9.5] Start API load generator in background (optional)"
+  ansible.builtin.shell: "nohup sh {{ repo_root }}/scripts/loadgen-api.sh &"
+  when: start_load_generators | default(false) | bool
+  changed_when: true
+  tags: [step9]
+
+- name: "[9.5] Load generator note"
+  ansible.builtin.debug:
+    msg: >
+      Load generators are NOT started automatically.
+      To start them, set start_load_generators: true in vars/main.yml
+      or run: sh scripts/loadgen-web.sh  and  sh scripts/loadgen-api.sh
+  when: not (start_load_generators | default(false) | bool)
+  tags: [step9]

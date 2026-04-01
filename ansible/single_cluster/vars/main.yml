@@ -1,0 +1,21 @@
+---
+# Cluster context – must match the name set in step 1
+ctx_east: admin-east
+
+# Cluster name
+east_cluster: cluster-east
+
+# Network name used in the Istio control-plane overlay
+east_network: network1
+
+# Shared mesh ID
+mesh_id: mesh1
+
+# Istio version for istioctl download
+istio_version: "1.27.5"
+
+# Repository root – two directory levels above this playbook
+repo_root: "{{ playbook_dir | dirname | dirname }}"
+
+# Set to true to apply the optional web-console notification banner
+apply_console_notifications: false

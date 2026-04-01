@@ -1,0 +1,53 @@
+---
+# Single-Cluster Demo – Full Deployment
+#
+# Usage:
+#   ansible-playbook site.yml                     # run all steps
+#   ansible-playbook site.yml --tags step5        # run a single step
+#   ansible-playbook site.yml --skip-tags step2   # skip istioctl install (Dev Spaces)
+#
+# Available tags: step1 step2 step3 step4 step5 step6 step7 step8 step9
+
+- name: Single-Cluster Demo – Full Deployment
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars_files:
+    - vars/main.yml
+
+  tasks:
+    - name: "Step 1 | Rename cluster context"
+      ansible.builtin.import_tasks: tasks/01_rename_context.yml
+      tags: [step1]
+
+    - name: "Step 2 | Install istioctl (skip with --skip-tags step2 for Dev Spaces)"
+      ansible.builtin.import_tasks: tasks/02_install_istioctl.yml
+      tags: [step2]
+
+    - name: "Step 3 | Verify cluster connectivity"
+      ansible.builtin.import_tasks: tasks/03_verify_cluster.yml
+      tags: [step3]
+
+    - name: "Step 4 | Install operators"
+      ansible.builtin.import_tasks: tasks/04_install_operators.yml
+      tags: [step4]
+
+    - name: "Step 5 | Create shared root CA"
+      ansible.builtin.import_tasks: tasks/05_root_ca.yml
+      tags: [step5]
+
+    - name: "Step 6 | Install tracing system"
+      ansible.builtin.import_tasks: tasks/06_tracing_system.yml
+      tags: [step6]
+
+    - name: "Step 7 | Install Istio resources"
+      ansible.builtin.import_tasks: tasks/07_istio_resources.yml
+      tags: [step7]
+
+    - name: "Step 8 | Kiali deployment"
+      ansible.builtin.import_tasks: tasks/08_kiali.yml
+      tags: [step8]
+
+    - name: "Step 9 | Bookinfo app"
+      ansible.builtin.import_tasks: tasks/09_bookinfo.yml
+      tags: [step9]

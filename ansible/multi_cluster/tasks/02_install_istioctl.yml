@@ -1,0 +1,47 @@
+---
+# Step 2: Install istioctl on the bastion host
+# Skip this entire step with: --skip-tags step2  (e.g. when using Dev Spaces)
+
+- name: "[2] Check if istioctl is already installed"
+  ansible.builtin.command: istioctl version --remote=false
+  register: istioctl_check
+  failed_when: false
+  changed_when: false
+  tags: [step2]
+
+- name: "[2] Download Istio {{ istio_version }}"
+  ansible.builtin.shell: |
+    curl -L https://istio.io/downloadIstio | ISTIO_VERSION={{ istio_version }} sh -
+  args:
+    chdir: /tmp
+    creates: /tmp/istio-{{ istio_version }}/bin/istioctl
+  when: istioctl_check.rc != 0
+  tags: [step2]
+
+- name: "[2] Install istioctl to /usr/local/bin"
+  ansible.builtin.copy:
+    src: /tmp/istio-{{ istio_version }}/bin/istioctl
+    dest: /usr/local/bin/istioctl
+    mode: "0755"
+    remote_src: true
+  become: true
+  when: istioctl_check.rc != 0
+  tags: [step2]
+
+- name: "[2] Remove Istio download directory"
+  ansible.builtin.file:
+    path: /tmp/istio-{{ istio_version }}
+    state: absent
+  when: istioctl_check.rc != 0
+  tags: [step2]
+
+- name: "[2] Verify istioctl installation"
+  ansible.builtin.command: istioctl version --remote=false
+  register: istioctl_version_out
+  changed_when: false
+  tags: [step2]
+
+- name: "[2] Show istioctl version"
+  ansible.builtin.debug:
+    msg: "{{ istioctl_version_out.stdout }}"
+  tags: [step2]

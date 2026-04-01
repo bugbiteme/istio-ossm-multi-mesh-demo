@@ -1,0 +1,235 @@
+---
+# Step 7: Install all Istio resources
+# Sub-sections: 7.1 CNI | 7.2 Control plane | 7.3 East-west gateways |
+#               7.4 Expose services | 7.5 Cross-cluster discovery | 7.6 Ingress gateway
+
+# --- 7.1 Istio CNI ---
+
+- name: "[7.1] Apply Istio CNI kustomization (east)"
+  ansible.builtin.command: >
+    oc --context="{{ ctx_east }}" apply -k {{ repo_root }}/manifests/ossm/istio-cni/
+  changed_when: true
+  tags: [step7]
+
+- name: "[7.1] Apply Istio CNI kustomization (west)"
+  ansible.builtin.command: >
+    oc --context="{{ ctx_west }}" apply -k {{ repo_root }}/manifests/ossm/istio-cni/
+  changed_when: true
+  tags: [step7]
+
+- name: "[7.1] Wait for istio-cni-node daemonset rollout (east)"
+  ansible.builtin.command: >
+    oc --context="{{ ctx_east }}" rollout status daemonset istio-cni-node -n istio-cni
+  changed_when: false
+  tags: [step7]
+
+- name: "[7.1] Wait for istio-cni-node daemonset rollout (west)"
+  ansible.builtin.command: >
+    oc --context="{{ ctx_west }}" rollout status daemonset istio-cni-node -n istio-cni
+  changed_when: false
+  tags: [step7]
+
+# --- 7.2 Istio control plane ---
+
+- name: "[7.2] Apply Istio control plane overlay (east)"
+  ansible.builtin.command: >
+    oc --context="{{ ctx_east }}"
+    apply -k {{ repo_root }}/manifests/ossm/istio-system/overlays/east
+  changed_when: true
+  tags: [step7]
+
+- name: "[7.2] Apply Istio control plane overlay (west)"
+  ansible.builtin.command: >
+    oc --context="{{ ctx_west }}"
+    apply -k {{ repo_root }}/manifests/ossm/istio-system/overlays/west
+  changed_when: true
+  tags: [step7]
+
+- name: "[7.2] Wait for Istio control plane to be ready (east)"
+  ansible.builtin.command: >
+    oc --context="{{ ctx_east }}" wait --for=condition=Ready
+    istio/default -n istio-system --timeout=300s
+  changed_when: false
+  tags: [step7]
+
+- name: "[7.2] Wait for Istio control plane to be ready (west)"
+  ansible.builtin.command: >
+    oc --context="{{ ctx_west }}" wait --for=condition=Ready
+    istio/default -n istio-system --timeout=300s
+  changed_when: false
+  tags: [step7]
+
+- name: "[7.2] Verify istio-ca-root-cert ConfigMap exists (east)"
+  ansible.builtin.command: >
+    oc --context="{{ ctx_east }}" get configmap istio-ca-root-cert -n istio-system
+  changed_when: false
+  register: east_ca_cm
+  tags: [step7]
+
+- name: "[7.2] Verify istio-ca-root-cert ConfigMap exists (west)"
+  ansible.builtin.command: >
+    oc --context="{{ ctx_west }}" get configmap istio-ca-root-cert -n istio-system
+  changed_when: false
+  register: west_ca_cm
+  tags: [step7]
+
+- name: "[7.2] Fail if istio-ca-root-cert is missing on either cluster"
+  ansible.builtin.fail:
+    msg: "istio-ca-root-cert ConfigMap is missing. Check that the cacerts secret was applied correctly."
+  when: east_ca_cm.rc != 0 or west_ca_cm.rc != 0
+  tags: [step7]
+
+# --- 7.3 East-west gateways ---
+
+- name: "[7.3] Deploy east-west gateway (east)"
+  ansible.builtin.command: >
+    oc --context="{{ ctx_east }}"
+    apply -f {{ repo_root }}/manifests/ossm/eastwest-gateway/east
+  changed_when: true
+  tags: [step7]
+
+- name: "[7.3] Deploy east-west gateway (west)"
+  ansible.builtin.command: >
+    oc --context="{{ ctx_west }}"
+    apply -f {{ repo_root }}/manifests/ossm/eastwest-gateway/west
+  changed_when: true
+  tags: [step7]
+
+- name: "[7.3] Wait for east-west gateway rollout (east)"
+  ansible.builtin.command: >
+    oc --context="{{ ctx_east }}" rollout status deployment istio-eastwestgateway
+    -n istio-system --timeout=120s
+  changed_when: false
+  tags: [step7]
+
+- name: "[7.3] Wait for east-west gateway rollout (west)"
+  ansible.builtin.command: >
+    oc --context="{{ ctx_west }}" rollout status deployment istio-eastwestgateway
+    -n istio-system --timeout=120s
+  changed_when: false
+  tags: [step7]
+
+- name: "[7.3] Collect east gateway external address"
+  ansible.builtin.command: >
+    oc --context="{{ ctx_east }}" get svc istio-eastwestgateway -n istio-system
+    -o jsonpath='{.status.loadBalancer.ingress[0].ip}{.status.loadBalancer.ingress[0].hostname}'
+  register: east_gw_addr_raw
+  until: east_gw_addr_raw.stdout | length > 0
+  retries: 20
+  delay: 15
+  changed_when: false
+  tags: [step7]
+
+- name: "[7.3] Collect west gateway external address"
+  ansible.builtin.command: >
+    oc --context="{{ ctx_west }}" get svc istio-eastwestgateway -n istio-system
+    -o jsonpath='{.status.loadBalancer.ingress[0].ip}{.status.loadBalancer.ingress[0].hostname}'
+  register: west_gw_addr_raw
+  until: west_gw_addr_raw.stdout | length > 0
+  retries: 20
+  delay: 15
+  changed_when: false
+  tags: [step7]
+
+- name: "[7.3] Set gateway address facts"
+  ansible.builtin.set_fact:
+    east_gw_addr: "{{ east_gw_addr_raw.stdout | trim }}"
+    west_gw_addr: "{{ west_gw_addr_raw.stdout | trim }}"
+  tags: [step7]
+
+- name: "[7.3] Show gateway addresses"
+  ansible.builtin.debug:
+    msg:
+      - "East gateway: {{ east_gw_addr }}"
+      - "West gateway: {{ west_gw_addr }}"
+  tags: [step7]
+
+# --- 7.4 Expose services through east-west gateways ---
+
+- name: "[7.4] Apply cross-network-gateway resources (east)"
+  ansible.builtin.command: >
+    oc --context="{{ ctx_east }}" -n istio-system
+    apply -f {{ repo_root }}/manifests/ossm/eastwest-gateway/common/
+  changed_when: true
+  tags: [step7]
+
+- name: "[7.4] Apply cross-network-gateway resources (west)"
+  ansible.builtin.command: >
+    oc --context="{{ ctx_west }}" -n istio-system
+    apply -f {{ repo_root }}/manifests/ossm/eastwest-gateway/common/
+  changed_when: true
+  tags: [step7]
+
+# --- 7.5 Cross-cluster endpoint discovery ---
+
+- name: "[7.5] Create remote secret for west cluster and apply to east"
+  ansible.builtin.shell: |
+    istioctl create-remote-secret \
+      --context="{{ ctx_west }}" \
+      --name="{{ west_cluster }}" | \
+      oc --context="{{ ctx_east }}" apply -n istio-system -f -
+  changed_when: true
+  tags: [step7]
+
+- name: "[7.5] Create remote secret for east cluster and apply to west"
+  ansible.builtin.shell: |
+    istioctl create-remote-secret \
+      --context="{{ ctx_east }}" \
+      --name="{{ east_cluster }}" | \
+      oc --context="{{ ctx_west }}" apply -n istio-system -f -
+  changed_when: true
+  tags: [step7]
+
+- name: "[7.5] Verify remote cluster status (east sees west)"
+  ansible.builtin.command: "istioctl --context={{ ctx_east }} remote-clusters"
+  register: east_remote_clusters
+  changed_when: false
+  tags: [step7]
+
+- name: "[7.5] Verify remote cluster status (west sees east)"
+  ansible.builtin.command: "istioctl --context={{ ctx_west }} remote-clusters"
+  register: west_remote_clusters
+  changed_when: false
+  tags: [step7]
+
+- name: "[7.5] Show remote cluster sync status"
+  ansible.builtin.debug:
+    msg:
+      - "East remote clusters: {{ east_remote_clusters.stdout_lines }}"
+      - "West remote clusters: {{ west_remote_clusters.stdout_lines }}"
+  tags: [step7]
+
+- name: "[7.5] Assert both clusters show synced status"
+  ansible.builtin.assert:
+    that:
+      - "'synced' in east_remote_clusters.stdout"
+      - "'synced' in west_remote_clusters.stdout"
+    fail_msg: "One or both clusters are not synced. Check remote secret configuration."
+    success_msg: "Both clusters are synced."
+  tags: [step7]
+
+# --- 7.6 Ingress gateway ---
+
+- name: "[7.6] Deploy ingress gateway (east)"
+  ansible.builtin.command: >
+    oc --context="{{ ctx_east }}"
+    apply -f {{ repo_root }}/manifests/ingress-gateway/
+  changed_when: true
+  tags: [step7]
+
+- name: "[7.6] Wait for prod-gateway to be programmed"
+  ansible.builtin.command: >
+    oc --context="{{ ctx_east }}" get gtw prod-gateway -n ingress-gateway
+    -o jsonpath='{.status.conditions[?(@.type=="Programmed")].status}'
+  register: gw_programmed
+  until: gw_programmed.stdout == "True"
+  retries: 20
+  delay: 15
+  changed_when: false
+  tags: [step7]
+
+- name: "[7.6] Show ingress gateway details"
+  ansible.builtin.command: >
+    oc --context="{{ ctx_east }}" get gtw prod-gateway -n ingress-gateway
+  changed_when: false
+  tags: [step7]

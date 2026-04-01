@@ -1,0 +1,133 @@
+---
+# Step 5: Create the shared root CA and load it into cert-manager on both clusters
+
+# --- 5.0 Generate root CA (runs once; skipped if files already exist) ---
+
+- name: "[5] Check if root CA key already exists"
+  ansible.builtin.stat:
+    path: "{{ repo_root }}/certs/root-ca.key"
+  register: root_ca_key_stat
+  tags: [step5]
+
+- name: "[5] Generate root CA private key"
+  ansible.builtin.command: openssl genrsa -out root-ca.key 4096
+  args:
+    chdir: "{{ repo_root }}/certs"
+    creates: "{{ repo_root }}/certs/root-ca.key"
+  when: not root_ca_key_stat.stat.exists
+  tags: [step5]
+
+- name: "[5] Generate root CA CSR"
+  ansible.builtin.command: >
+    openssl req -new -key root-ca.key -config root-ca.conf -out root-ca.csr
+  args:
+    chdir: "{{ repo_root }}/certs"
+    creates: "{{ repo_root }}/certs/root-ca.csr"
+  when: not root_ca_key_stat.stat.exists
+  tags: [step5]
+
+- name: "[5] Self-sign root CA certificate"
+  ansible.builtin.command: >
+    openssl x509 -req -days 3650 -signkey root-ca.key
+    -extensions req_ext -extfile root-ca.conf
+    -in root-ca.csr -out root-ca.crt
+  args:
+    chdir: "{{ repo_root }}/certs"
+    creates: "{{ repo_root }}/certs/root-ca.crt"
+  when: not root_ca_key_stat.stat.exists
+  tags: [step5]
+
+# --- 5.1 Load root CA into cert-manager (both clusters) ---
+
+- name: "[5.1] Ensure istio-system namespace exists (east)"
+  ansible.builtin.shell: |
+    oc --context="{{ ctx_east }}" create namespace istio-system \
+      --dry-run=client -o yaml | oc --context="{{ ctx_east }}" apply -f -
+  changed_when: true
+  tags: [step5]
+
+- name: "[5.1] Ensure istio-system namespace exists (west)"
+  ansible.builtin.shell: |
+    oc --context="{{ ctx_west }}" create namespace istio-system \
+      --dry-run=client -o yaml | oc --context="{{ ctx_west }}" apply -f -
+  changed_when: true
+  tags: [step5]
+
+- name: "[5.1] Create root-ca-secret in cert-manager (east)"
+  ansible.builtin.shell: |
+    oc --context="{{ ctx_east }}" create secret tls root-ca-secret \
+      -n cert-manager \
+      --cert={{ repo_root }}/certs/root-ca.crt \
+      --key={{ repo_root }}/certs/root-ca.key \
+      --dry-run=client -o yaml | oc --context="{{ ctx_east }}" apply -f -
+  changed_when: true
+  tags: [step5]
+
+- name: "[5.1] Create root-ca-secret in cert-manager (west)"
+  ansible.builtin.shell: |
+    oc --context="{{ ctx_west }}" create secret tls root-ca-secret \
+      -n cert-manager \
+      --cert={{ repo_root }}/certs/root-ca.crt \
+      --key={{ repo_root }}/certs/root-ca.key \
+      --dry-run=client -o yaml | oc --context="{{ ctx_west }}" apply -f -
+  changed_when: true
+  tags: [step5]
+
+- name: "[5.1] Apply ClusterIssuer (east)"
+  ansible.builtin.command: >
+    oc --context="{{ ctx_east }}"
+    apply -f {{ repo_root }}/manifests/cert-manager/clusterissuer.yaml
+  changed_when: true
+  tags: [step5]
+
+- name: "[5.1] Apply ClusterIssuer (west)"
+  ansible.builtin.command: >
+    oc --context="{{ ctx_west }}"
+    apply -f {{ repo_root }}/manifests/cert-manager/clusterissuer.yaml
+  changed_when: true
+  tags: [step5]
+
+# --- 5.2 Issue intermediate CA certificates ---
+
+- name: "[5.2] Apply east intermediate CA manifest"
+  ansible.builtin.command: >
+    oc --context="{{ ctx_east }}"
+    apply -f {{ repo_root }}/manifests/cert-manager/east-intermediate-ca.yaml
+  changed_when: true
+  tags: [step5]
+
+- name: "[5.2] Apply west intermediate CA manifest"
+  ansible.builtin.command: >
+    oc --context="{{ ctx_west }}"
+    apply -f {{ repo_root }}/manifests/cert-manager/west-intermediate-ca.yaml
+  changed_when: true
+  tags: [step5]
+
+- name: "[5.2] Wait for cacerts secret to be populated (east)"
+  ansible.builtin.command: >
+    oc --context="{{ ctx_east }}" get secret cacerts -n istio-system
+    -o jsonpath='{.data.ca\.crt}'
+  register: east_cacerts
+  until: east_cacerts.stdout | length > 0
+  retries: 20
+  delay: 15
+  changed_when: false
+  tags: [step5]
+
+- name: "[5.2] Wait for cacerts secret to be populated (west)"
+  ansible.builtin.command: >
+    oc --context="{{ ctx_west }}" get secret cacerts -n istio-system
+    -o jsonpath='{.data.ca\.crt}'
+  register: west_cacerts
+  until: west_cacerts.stdout | length > 0
+  retries: 20
+  delay: 15
+  changed_when: false
+  tags: [step5]
+
+- name: "[5.2] Confirm cacerts secrets are present"
+  ansible.builtin.debug:
+    msg:
+      - "East cacerts: populated ({{ east_cacerts.stdout | length }} bytes base64)"
+      - "West cacerts: populated ({{ west_cacerts.stdout | length }} bytes base64)"
+  tags: [step5]
