@@ -1,14 +1,18 @@
-apiVersion: telemetry.istio.io/v1alpha1
+apiVersion: telemetry.istio.io/v1
 kind: Telemetry
 metadata:
-  name: mesh-id-override
+  name: mesh-default
   namespace: istio-system
 spec:
   metrics:
-    - providers:
-        - name: prometheus
-        - name: otel
-      overrides:
-        - tagOverrides:
-            mesh_id:
-              value: "mesh1"
+  - providers:
+    - name: prometheus
+    - name: otel
+  tracing:
+  - providers:
+    - name: otel
+    randomSamplingPercentage: 100
+      # overrides:
+      #   - tagOverrides:
+      #       mesh_id:
+      #         value: "mesh1"

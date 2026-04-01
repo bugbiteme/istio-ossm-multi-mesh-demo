@@ -199,6 +199,27 @@ commands:
           echo "✔ boto3 already installed"
         fi
 
+  # 7. Set OC context alias to admin-east
+  - id: set-oc-context
+    exec:
+      label: "Setup: Rename current OC context to admin-east"
+      component: tools
+      commandLine: |
+        CURRENT_CTX=$(oc config current-context 2>/dev/null)
+        if [ -z "$CURRENT_CTX" ]; then
+          echo "⚠ No active OC context found — skipping rename"
+          exit 0
+        fi
+        echo "→ Current context: ${CURRENT_CTX}"
+        if [ "$CURRENT_CTX" != "admin-east" ]; then
+          oc config rename-context "${CURRENT_CTX}" admin-east
+          echo "✔ Renamed context '${CURRENT_CTX}' → 'admin-east'"
+        else
+          echo "✔ Context already named 'admin-east'"
+        fi
+        oc config use-context admin-east
+        echo "✔ Using context: admin-east"
+
   # Convenience: run the full setup in one shot (useful for manual re-runs)
   - id: full-setup
     exec:
@@ -247,3 +268,4 @@ events:
     - install-kustomize
     - install-helm
     - install-ansible
+    - set-oc-context

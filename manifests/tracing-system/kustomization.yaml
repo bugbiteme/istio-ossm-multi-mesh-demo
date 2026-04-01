@@ -6,3 +6,4 @@ resources:
   - minio.yaml
   - tempo-stack.yaml
   - tracing-ui-plugin.yaml
+  - tracing-rbac.yaml

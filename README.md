@@ -200,7 +200,7 @@ oc --context="${CTX_WEST}" apply -k manifests/tracing-system/
 ```
 This will install s3 storage (minio), as well as the temo-stack for distributed tracing
 
-wait/verify step after applying — Tempo takes time to provision
+wait/verify step after applying — Tempo takes time to provision (you will see errors until things stablize)
 
 ```bash
 oc --context="${CTX_EAST}" wait --for=condition=Ready tempostack/sample -n tracing-system --timeout=300s                                                                                                                           

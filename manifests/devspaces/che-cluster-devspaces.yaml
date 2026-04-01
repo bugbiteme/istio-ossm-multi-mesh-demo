@@ -1,0 +1,75 @@
+apiVersion: v1
+items:
+- apiVersion: org.eclipse.che/v2
+  kind: CheCluster
+  metadata:
+
+    finalizers:
+    - checluster.che.eclipse.org
+    - cheGateway.clusterpermissions.finalizers.che.eclipse.org
+    - oauthclients.finalizers.che.eclipse.org
+    - dashboard.clusterpermissions.finalizers.che.eclipse.org
+    - container-build.finalizers.che.eclipse.org
+    - consolelink.finalizers.che.eclipse.org
+
+    name: devspaces
+    namespace: devspaces
+  
+  spec:
+    components:
+      cheServer:
+        debug: false
+        logLevel: INFO
+      dashboard:
+        logLevel: ERROR
+      devWorkspace: {}
+      devfileRegistry: {}
+      imagePuller:
+        enable: false
+        spec: {}
+      metrics:
+        enable: true
+      pluginRegistry: {}
+    containerRegistry: {}
+    devEnvironments:
+      containerBuildConfiguration:
+        openShiftSecurityContextConstraint: container-build
+      containerRunConfiguration:
+        containerSecurityContext:
+          allowPrivilegeEscalation: true
+          capabilities:
+            add:
+            - SETGID
+            - SETUID
+          procMount: Unmasked
+        openShiftSecurityContextConstraint: container-run
+        workspacesPodAnnotations:
+          io.kubernetes.cri-o.Devices: /dev/fuse,/dev/net/tun
+      defaultNamespace:
+        autoProvision: true
+        template: <username>-devspaces
+      disableContainerRunCapabilities: true
+      ignoredUnrecoverableEvents:
+      - FailedScheduling
+      maxNumberOfWorkspacesPerUser: -1
+      # change for timeout so you don get booted. currently 7200 seconds (2 hr)
+      secondsOfInactivityBeforeIdling: 7200
+      secondsOfRunBeforeIdling: -1
+      security: {}
+      startTimeoutSeconds: 300
+      storage:
+        pvcStrategy: per-user
+    gitServices: {}
+    networking:
+      auth:
+        gateway:
+          configLabels:
+            app: che
+            component: che-gateway-config
+          kubeRbacProxy:
+            logLevel: 0
+          oAuthProxy:
+            cookieExpireSeconds: 86400
+          traefik:
+            logLevel: INFO
+  

@@ -38,6 +38,10 @@ spec:
       defaultDestinationRuleExportTo: ["*"]
       trustDomain: cluster.local
       # For distributed tracing
+   
+      defaultProviders:
+        tracing:
+        - otel
       enableTracing: true
       extensionProviders:
       - name: otel
