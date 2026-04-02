@@ -5,68 +5,98 @@
 # --- 7.1 Istio CNI ---
 
 - name: "[7.1] Apply Istio CNI kustomization"
-  ansible.builtin.command: >
-    oc --context="{{ ctx_east }}" apply -k {{ repo_root }}/manifests/ossm/istio-cni/
-  changed_when: true
+  kubernetes.core.k8s:
+    context: "{{ ctx_east }}"
+    definition: "{{ lookup('kubernetes.core.kustomize', dir=repo_root ~ '/manifests/ossm/istio-cni') }}"
+    state: present
+    apply: true
   tags: [step7]
 
 - name: "[7.1] Wait for istio-cni-node daemonset rollout"
-  ansible.builtin.command: >
-    oc --context="{{ ctx_east }}" rollout status daemonset istio-cni-node -n istio-cni
-  changed_when: false
+  kubernetes.core.k8s_info:
+    context: "{{ ctx_east }}"
+    api_version: apps/v1
+    kind: DaemonSet
+    name: istio-cni-node
+    namespace: istio-cni
+  register: cni_ds
+  until: >
+    cni_ds.resources | length > 0 and
+    (cni_ds.resources[0].status.desiredNumberScheduled | default(0) | int) > 0 and
+    (cni_ds.resources[0].status.numberReady | default(0) | int) >=
+    (cni_ds.resources[0].status.desiredNumberScheduled | default(0) | int)
+  retries: 60
+  delay: 5
   tags: [step7]
 
 # --- 7.2 Istio control plane ---
 
 - name: "[7.2] Apply Istio control plane overlay (east)"
-  ansible.builtin.command: >
-    oc --context="{{ ctx_east }}"
-    apply -k {{ repo_root }}/manifests/ossm/istio-system/overlays/east
-  changed_when: true
+  kubernetes.core.k8s:
+    context: "{{ ctx_east }}"
+    definition: "{{ lookup('kubernetes.core.kustomize', dir=repo_root ~ '/manifests/ossm/istio-system/overlays/east') }}"
+    state: present
+    apply: true
   tags: [step7]
 
 - name: "[7.2] Wait for Istio control plane to be ready"
-  ansible.builtin.command: >
-    oc --context="{{ ctx_east }}" wait --for=condition=Ready
-    istio/default -n istio-system --timeout=300s
-  changed_when: false
+  kubernetes.core.k8s_info:
+    context: "{{ ctx_east }}"
+    api_version: sailoperator.io/v1
+    kind: Istio
+    name: default
+    namespace: istio-system
+  register: istio_cr
+  until: >
+    istio_cr.resources | length > 0 and
+    (
+      istio_cr.resources[0].status.conditions | default([]) |
+      selectattr('type', 'equalto', 'Ready') | map(attribute='status') | first | default('')
+    ) == 'True'
+  retries: 60
+  delay: 5
   tags: [step7]
 
 - name: "[7.2] Verify istio-ca-root-cert ConfigMap exists"
-  ansible.builtin.command: >
-    oc --context="{{ ctx_east }}" get configmap istio-ca-root-cert -n istio-system
-  changed_when: false
+  kubernetes.core.k8s_info:
+    context: "{{ ctx_east }}"
+    api_version: v1
+    kind: ConfigMap
+    name: istio-ca-root-cert
+    namespace: istio-system
   register: ca_cm
-  tags: [step7]
-
-- name: "[7.2] Fail if istio-ca-root-cert is missing"
-  ansible.builtin.fail:
-    msg: "istio-ca-root-cert ConfigMap is missing. Check that the cacerts secret was applied correctly."
-  when: ca_cm.rc != 0
+  failed_when: ca_cm.resources | length == 0
   tags: [step7]
 
 # --- 7.3 Ingress gateway ---
 
 - name: "[7.3] Deploy ingress gateway"
-  ansible.builtin.command: >
-    oc --context="{{ ctx_east }}"
-    apply -f {{ repo_root }}/manifests/ingress-gateway/
-  changed_when: true
+  kubernetes.core.k8s:
+    context: "{{ ctx_east }}"
+    src: "{{ repo_root }}/manifests/ingress-gateway/gateway.yaml"
+    state: present
+    apply: true
   tags: [step7]
 
 - name: "[7.3] Wait for prod-gateway to be programmed"
-  ansible.builtin.command: >
-    oc --context="{{ ctx_east }}" get gtw prod-gateway -n ingress-gateway
-    -o jsonpath='{.status.conditions[?(@.type=="Programmed")].status}'
-  register: gw_programmed
-  until: gw_programmed.stdout == "True"
+  kubernetes.core.k8s_info:
+    context: "{{ ctx_east }}"
+    api_version: gateway.networking.k8s.io/v1
+    kind: Gateway
+    name: prod-gateway
+    namespace: ingress-gateway
+  register: prod_gw
+  until: >
+    prod_gw.resources | length > 0 and
+    (
+      prod_gw.resources[0].status.conditions | default([]) |
+      selectattr('type', 'equalto', 'Programmed') | map(attribute='status') | first | default('')
+    ) == 'True'
   retries: 20
   delay: 15
-  changed_when: false
   tags: [step7]
 
 - name: "[7.3] Show ingress gateway details"
-  ansible.builtin.command: >
-    oc --context="{{ ctx_east }}" get gtw prod-gateway -n ingress-gateway
-  changed_when: false
+  ansible.builtin.debug:
+    msg: "{{ prod_gw.resources[0] | to_json }}"
   tags: [step7]

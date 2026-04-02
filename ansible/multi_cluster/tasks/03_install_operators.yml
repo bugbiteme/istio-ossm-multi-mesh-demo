@@ -1,0 +1,118 @@
+---
+# Step 3: Install operators on both clusters (OLM / Subscription + CSVs)
+
+- name: "[3] Apply operators kustomization (east)"
+  kubernetes.core.k8s:
+    context: "{{ ctx_east }}"
+    definition: "{{ lookup('kubernetes.core.kustomize', dir=repo_root ~ '/manifests/operators') }}"
+    state: present
+    apply: true
+  tags: [step3]
+
+- name: "[3] Apply operators kustomization (west)"
+  kubernetes.core.k8s:
+    context: "{{ ctx_west }}"
+    definition: "{{ lookup('kubernetes.core.kustomize', dir=repo_root ~ '/manifests/operators') }}"
+    state: present
+    apply: true
+  tags: [step3]
+
+- name: "[3.1] Check current CSV phases (east)"
+  kubernetes.core.k8s_info:
+    context: "{{ ctx_east }}"
+    api_version: operators.coreos.com/v1alpha1
+    kind: ClusterServiceVersion
+    namespace: openshift-operators
+  register: east_csv_list_pre
+  tags: [step3]
+
+- name: "[3.1] Wait for CSVs to reach Succeeded (east)"
+  kubernetes.core.k8s_info:
+    context: "{{ ctx_east }}"
+    api_version: operators.coreos.com/v1alpha1
+    kind: ClusterServiceVersion
+    namespace: openshift-operators
+  register: east_csv_list
+  until: >
+    east_csv_list.resources | length > 0 and
+    (
+      (
+        (east_csv_list.resources | map(attribute='status', default={}) | map(attribute='phase', default='Missing') | list | unique | length) == 1 and
+        (east_csv_list.resources | map(attribute='status', default={}) | map(attribute='phase', default='Missing') | list | first) == 'Succeeded'
+      ) or
+      (east_csv_list.resources | selectattr('status.phase', 'defined') | selectattr('status.phase', 'equalto', 'Failed') | list | length > 0)
+    )
+  retries: 30
+  delay: 20
+  failed_when: >
+    east_csv_list.resources | selectattr('status.phase', 'defined') | selectattr('status.phase', 'equalto', 'Failed') | list | length > 0
+  when: >
+    east_csv_list_pre.resources | length == 0 or
+    (
+      east_csv_list_pre.resources
+      | map(attribute='status', default={})
+      | map(attribute='phase', default='')
+      | list
+      | select('in', ['Installing', 'Pending', ''])
+      | list
+      | length
+    ) > 0
+  tags: [step3]
+
+- name: "[3.1] Show CSV phases (east)"
+  ansible.builtin.debug:
+    msg: "{{ item.metadata.name }}: {{ item.status.phase | default('unknown') }}"
+  loop: "{{ ((east_csv_list | default({})).resources) | default(east_csv_list_pre.resources) }}"
+  loop_control:
+    label: "{{ item.metadata.name }}"
+  tags: [step3]
+
+- name: "[3.1] Check current CSV phases (west)"
+  kubernetes.core.k8s_info:
+    context: "{{ ctx_west }}"
+    api_version: operators.coreos.com/v1alpha1
+    kind: ClusterServiceVersion
+    namespace: openshift-operators
+  register: west_csv_list_pre
+  tags: [step3]
+
+- name: "[3.1] Wait for CSVs to reach Succeeded (west)"
+  kubernetes.core.k8s_info:
+    context: "{{ ctx_west }}"
+    api_version: operators.coreos.com/v1alpha1
+    kind: ClusterServiceVersion
+    namespace: openshift-operators
+  register: west_csv_list
+  until: >
+    west_csv_list.resources | length > 0 and
+    (
+      (
+        (west_csv_list.resources | map(attribute='status', default={}) | map(attribute='phase', default='Missing') | list | unique | length) == 1 and
+        (west_csv_list.resources | map(attribute='status', default={}) | map(attribute='phase', default='Missing') | list | first) == 'Succeeded'
+      ) or
+      (west_csv_list.resources | selectattr('status.phase', 'defined') | selectattr('status.phase', 'equalto', 'Failed') | list | length > 0)
+    )
+  retries: 30
+  delay: 20
+  failed_when: >
+    west_csv_list.resources | selectattr('status.phase', 'defined') | selectattr('status.phase', 'equalto', 'Failed') | list | length > 0
+  when: >
+    west_csv_list_pre.resources | length == 0 or
+    (
+      west_csv_list_pre.resources
+      | map(attribute='status', default={})
+      | map(attribute='phase', default='')
+      | list
+      | select('in', ['Installing', 'Pending', ''])
+      | list
+      | length
+    ) > 0
+  tags: [step3]
+
+- name: "[3.1] Show CSV phases (west)"
+  ansible.builtin.debug:
+    msg: "{{ item.metadata.name }}: {{ item.status.phase | default('unknown') }}"
+  loop: "{{ ((west_csv_list | default({})).resources) | default(west_csv_list_pre.resources) }}"
+  loop_control:
+    label: "{{ item.metadata.name }}"
+  tags: [step3]

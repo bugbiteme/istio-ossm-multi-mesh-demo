@@ -35,7 +35,7 @@
     apply -f {{ repo_root }}/manifests/cluster/east/console-notification.yaml
   when: apply_console_notifications | bool
   changed_when: true
-  tags: [step1]
+  tags: [step1_console]
 
 # --- 1.2 West cluster ---
 
@@ -81,4 +81,4 @@
     apply -f {{ repo_root }}/manifests/cluster/west/console-notification.yaml
   when: apply_console_notifications | bool
   changed_when: true
-  tags: [step1]
+  tags: [step1_console]

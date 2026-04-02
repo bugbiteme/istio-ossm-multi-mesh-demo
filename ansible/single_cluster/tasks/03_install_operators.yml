@@ -1,0 +1,60 @@
+---
+# Step 3: Install operators (OLM / Subscription + CSVs)
+
+- name: "[3] Apply operators kustomization"
+  kubernetes.core.k8s:
+    context: "{{ ctx_east }}"
+    definition: "{{ lookup('kubernetes.core.kustomize', dir=repo_root ~ '/manifests/operators') }}"
+    state: present
+    apply: true
+  tags: [step3]
+
+- name: "[3.1] Check current CSV phases"
+  kubernetes.core.k8s_info:
+    context: "{{ ctx_east }}"
+    api_version: operators.coreos.com/v1alpha1
+    kind: ClusterServiceVersion
+    namespace: openshift-operators
+  register: csv_list_pre
+  tags: [step3]
+
+- name: "[3.1] Wait for CSVs to reach Succeeded"
+  kubernetes.core.k8s_info:
+    context: "{{ ctx_east }}"
+    api_version: operators.coreos.com/v1alpha1
+    kind: ClusterServiceVersion
+    namespace: openshift-operators
+  register: csv_list
+  until: >
+    csv_list.resources | length > 0 and
+    (
+      (
+        (csv_list.resources | map(attribute='status', default={}) | map(attribute='phase', default='Missing') | list | unique | length) == 1 and
+        (csv_list.resources | map(attribute='status', default={}) | map(attribute='phase', default='Missing') | list | first) == 'Succeeded'
+      ) or
+      (csv_list.resources | selectattr('status.phase', 'defined') | selectattr('status.phase', 'equalto', 'Failed') | list | length > 0)
+    )
+  retries: 30
+  delay: 20
+  failed_when: >
+    csv_list.resources | selectattr('status.phase', 'defined') | selectattr('status.phase', 'equalto', 'Failed') | list | length > 0
+  when: >
+    csv_list_pre.resources | length == 0 or
+    (
+      csv_list_pre.resources
+      | map(attribute='status', default={})
+      | map(attribute='phase', default='')
+      | list
+      | select('in', ['Installing', 'Pending', ''])
+      | list
+      | length
+    ) > 0
+  tags: [step3]
+
+- name: "[3.1] Show CSV phases"
+  ansible.builtin.debug:
+    msg: "{{ item.metadata.name }}: {{ item.status.phase | default('unknown') }}"
+  loop: "{{ ((csv_list | default({})).resources) | default(csv_list_pre.resources) }}"
+  loop_control:
+    label: "{{ item.metadata.name }}"
+  tags: [step3]

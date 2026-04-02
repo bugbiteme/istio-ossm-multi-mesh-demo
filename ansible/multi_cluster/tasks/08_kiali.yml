@@ -3,62 +3,130 @@
 
 # --- Extract Tempo signing CA and create cacert secret ---
 
-- name: "[8] Extract Tempo signing CA certificate (east)"
-  ansible.builtin.shell: |
-    oc --context="{{ ctx_east }}" get secret tempo-sample-signing-ca \
-      -n tracing-system \
-      -o jsonpath='{.data.tls\.crt}' | base64 -d > {{ repo_root }}/certs/ca-east.crt
-  changed_when: true
+- name: "[8] Read Tempo signing CA certificate from cluster (east)"
+  kubernetes.core.k8s_info:
+    context: "{{ ctx_east }}"
+    api_version: v1
+    kind: Secret
+    name: tempo-sample-signing-ca
+    namespace: tracing-system
+  register: east_tempo_ca_secret
+  failed_when: east_tempo_ca_secret.resources | length == 0
+  tags: [step8]
+
+- name: "[8] Write Tempo signing CA to local file (east)"
+  ansible.builtin.copy:
+    dest: "{{ repo_root }}/certs/ca-east.crt"
+    content: "{{ east_tempo_ca_secret.resources[0].data['tls.crt'] | b64decode }}"
+    mode: "0600"
   tags: [step8]
 
 - name: "[8] Create cacert secret in istio-system (east)"
-  ansible.builtin.shell: |
-    oc --context="{{ ctx_east }}" create secret generic cacert \
-      --from-file=ca.crt={{ repo_root }}/certs/ca-east.crt \
-      -n istio-system \
-      --dry-run=client -o yaml | oc --context="{{ ctx_east }}" apply -f -
-  changed_when: true
+  kubernetes.core.k8s:
+    context: "{{ ctx_east }}"
+    definition:
+      apiVersion: v1
+      kind: Secret
+      metadata:
+        name: cacert
+        namespace: istio-system
+      type: Opaque
+      stringData:
+        ca.crt: "{{ lookup('ansible.builtin.file', repo_root ~ '/certs/ca-east.crt') }}"
+    state: present
+    apply: true
   tags: [step8]
 
-- name: "[8] Extract Tempo signing CA certificate (west)"
-  ansible.builtin.shell: |
-    oc --context="{{ ctx_west }}" get secret tempo-sample-signing-ca \
-      -n tracing-system \
-      -o jsonpath='{.data.tls\.crt}' | base64 -d > {{ repo_root }}/certs/ca-west.crt
-  changed_when: true
+- name: "[8] Read Tempo signing CA certificate from cluster (west)"
+  kubernetes.core.k8s_info:
+    context: "{{ ctx_west }}"
+    api_version: v1
+    kind: Secret
+    name: tempo-sample-signing-ca
+    namespace: tracing-system
+  register: west_tempo_ca_secret
+  failed_when: west_tempo_ca_secret.resources | length == 0
+  tags: [step8]
+
+- name: "[8] Write Tempo signing CA to local file (west)"
+  ansible.builtin.copy:
+    dest: "{{ repo_root }}/certs/ca-west.crt"
+    content: "{{ west_tempo_ca_secret.resources[0].data['tls.crt'] | b64decode }}"
+    mode: "0600"
   tags: [step8]
 
 - name: "[8] Create cacert secret in istio-system (west)"
-  ansible.builtin.shell: |
-    oc --context="{{ ctx_west }}" create secret generic cacert \
-      --from-file=ca.crt={{ repo_root }}/certs/ca-west.crt \
-      -n istio-system \
-      --dry-run=client -o yaml | oc --context="{{ ctx_west }}" apply -f -
-  changed_when: true
+  kubernetes.core.k8s:
+    context: "{{ ctx_west }}"
+    definition:
+      apiVersion: v1
+      kind: Secret
+      metadata:
+        name: cacert
+        namespace: istio-system
+      type: Opaque
+      stringData:
+        ca.crt: "{{ lookup('ansible.builtin.file', repo_root ~ '/certs/ca-west.crt') }}"
+    state: present
+    apply: true
   tags: [step8]
 
 # --- Apply Kiali CR ---
 
-- name: "[8] Apply Kiali CR (east)"
-  ansible.builtin.command: >
-    oc --context="{{ ctx_east }}" apply -f {{ repo_root }}/manifests/ossm/kiali/
-  changed_when: true
+- name: "[8] Apply Kiali manifests (east)"
+  kubernetes.core.k8s:
+    context: "{{ ctx_east }}"
+    src: "{{ item }}"
+    state: present
+    apply: true
+  loop:
+    - "{{ repo_root }}/manifests/ossm/kiali/kiali-monitoring-rbac.yaml"
+    - "{{ repo_root }}/manifests/ossm/kiali/kiali-ossmc.yaml"
+    - "{{ repo_root }}/manifests/ossm/kiali/kiali.yaml"
   tags: [step8]
 
-- name: "[8] Apply Kiali CR (west)"
-  ansible.builtin.command: >
-    oc --context="{{ ctx_west }}" apply -f {{ repo_root }}/manifests/ossm/kiali/
-  changed_when: true
+- name: "[8] Apply Kiali manifests (west)"
+  kubernetes.core.k8s:
+    context: "{{ ctx_west }}"
+    src: "{{ item }}"
+    state: present
+    apply: true
+  loop:
+    - "{{ repo_root }}/manifests/ossm/kiali/kiali-monitoring-rbac.yaml"
+    - "{{ repo_root }}/manifests/ossm/kiali/kiali-ossmc.yaml"
+    - "{{ repo_root }}/manifests/ossm/kiali/kiali.yaml"
   tags: [step8]
 
 - name: "[8] Wait for Kiali deployment to be ready (east)"
-  ansible.builtin.command: >
-    oc --context="{{ ctx_east }}" rollout status deployment kiali -n istio-system
-  changed_when: false
+  kubernetes.core.k8s_info:
+    context: "{{ ctx_east }}"
+    api_version: apps/v1
+    kind: Deployment
+    name: kiali
+    namespace: istio-system
+  register: east_kiali_dep
+  until: >
+    east_kiali_dep.resources | length > 0 and
+    (east_kiali_dep.resources[0].status.replicas | default(0) | int) > 0 and
+    (east_kiali_dep.resources[0].status.readyReplicas | default(0) | int) >=
+    (east_kiali_dep.resources[0].status.replicas | default(0) | int)
+  retries: 60
+  delay: 5
   tags: [step8]
 
 - name: "[8] Wait for Kiali deployment to be ready (west)"
-  ansible.builtin.command: >
-    oc --context="{{ ctx_west }}" rollout status deployment kiali -n istio-system
-  changed_when: false
+  kubernetes.core.k8s_info:
+    context: "{{ ctx_west }}"
+    api_version: apps/v1
+    kind: Deployment
+    name: kiali
+    namespace: istio-system
+  register: west_kiali_dep
+  until: >
+    west_kiali_dep.resources | length > 0 and
+    (west_kiali_dep.resources[0].status.replicas | default(0) | int) > 0 and
+    (west_kiali_dep.resources[0].status.readyReplicas | default(0) | int) >=
+    (west_kiali_dep.resources[0].status.replicas | default(0) | int)
+  retries: 60
+  delay: 5
   tags: [step8]

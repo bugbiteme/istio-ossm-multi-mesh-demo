@@ -1,0 +1,36 @@
+---
+# Named context (default): set preflight_oc_context (e.g. admin-east).
+# Current context: set preflight_use_current_kube_context: true — uses whatever
+# `oc login` selected; no --context (ctx_east may not exist until step 1).
+
+- name: Preflight | Require kubeconfig entry for target context
+  ansible.builtin.command: oc config get-contexts {{ preflight_oc_context }}
+  changed_when: false
+  register: preflight_ctx
+  failed_when: preflight_ctx.rc != 0
+  when: not (preflight_use_current_kube_context | default(false) | bool)
+
+- name: Preflight | Require active kubeconfig context
+  ansible.builtin.command: oc config current-context
+  changed_when: false
+  register: preflight_cur
+  failed_when: preflight_cur.stdout | trim | length == 0
+  when: preflight_use_current_kube_context | default(false) | bool
+
+- name: Preflight | Verify API reachable with explicit kubeconfig context
+  ansible.builtin.command: oc --context="{{ preflight_oc_context }}" cluster-info
+  changed_when: false
+  register: preflight_api_named
+  until: preflight_api_named.rc == 0
+  retries: 6
+  delay: 10
+  when: not (preflight_use_current_kube_context | default(false) | bool)
+
+- name: Preflight | Verify API reachable (current kubeconfig context)
+  ansible.builtin.command: oc cluster-info
+  changed_when: false
+  register: preflight_api_current
+  until: preflight_api_current.rc == 0
+  retries: 6
+  delay: 10
+  when: preflight_use_current_kube_context | default(false) | bool

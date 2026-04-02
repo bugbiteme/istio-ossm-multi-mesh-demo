@@ -1,0 +1,27 @@
+---
+# Step 4: Enable OpenShift user workload monitoring
+
+- name: "[4] Enable user workload monitoring"
+  kubernetes.core.k8s:
+    context: "{{ ctx_east }}"
+    src: "{{ repo_root }}/manifests/monitoring/user-workload-monitoring.yaml"
+    state: present
+    apply: true
+  tags: [step4]
+
+- name: "[4.1] Wait for prometheus-user-workload StatefulSet rollout"
+  kubernetes.core.k8s_info:
+    context: "{{ ctx_east }}"
+    api_version: apps/v1
+    kind: StatefulSet
+    name: prometheus-user-workload
+    namespace: openshift-user-workload-monitoring
+  register: prom_uwm
+  until: >
+    prom_uwm.resources | length > 0 and
+    (prom_uwm.resources[0].status.replicas | default(0) | int) > 0 and
+    (prom_uwm.resources[0].status.readyReplicas | default(0) | int) >=
+    (prom_uwm.resources[0].status.replicas | default(0) | int)
+  retries: 36
+  delay: 5
+  tags: [step4]

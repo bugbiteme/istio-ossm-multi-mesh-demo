@@ -9,10 +9,12 @@
   changed_when: false
   tags: [step2]
 
-- name: "[2] Download Istio {{ istio_version }}"
+- name: "[2] Download Istio release {{ istio_version }}"
   ansible.builtin.shell: |
+    set -o pipefail
     curl -L https://istio.io/downloadIstio | ISTIO_VERSION={{ istio_version }} sh -
   args:
+    executable: /bin/bash
     chdir: /tmp
     creates: /tmp/istio-{{ istio_version }}/bin/istioctl
   when: istioctl_check.rc != 0

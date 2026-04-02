@@ -6,7 +6,7 @@
 #   ansible-playbook site.yml --tags step5        # run a single step
 #   ansible-playbook site.yml --skip-tags step2   # skip istioctl install (Dev Spaces)
 #
-# Available tags: step1 step2 step3 step4 step5 step6 step7 step8 step9
+# Available tags: preflight step1 step1_console step2 step3…step9 (API via preflight; step3=operators, step4=UWM)
 
 - name: Multi-Mesh Demo – Full Deployment
   hosts: localhost
@@ -14,6 +14,34 @@
   gather_facts: false
   vars_files:
     - vars/main.yml
+  vars:
+    repo_root: "{{ (playbook_dir ~ '/../..') | realpath }}"
+
+  pre_tasks:
+    # Skip when only step1: kubeconfig rename/switch only (west context may not exist yet).
+    - name: Preflight | OpenShift API reachability (east)
+      ansible.builtin.import_tasks: ../includes/preflight_oc_api.yml
+      vars:
+        preflight_oc_context: "{{ ctx_east }}"
+      tags: [always, preflight]
+      when: >
+        not (
+          (ansible_run_tags | default([]) | length == 1) and
+          ('step1' in (ansible_run_tags | default([]))) and
+          ('preflight' not in (ansible_run_tags | default([])))
+        )
+
+    - name: Preflight | OpenShift API reachability (west)
+      ansible.builtin.import_tasks: ../includes/preflight_oc_api.yml
+      vars:
+        preflight_oc_context: "{{ ctx_west }}"
+      tags: [always, preflight]
+      when: >
+        not (
+          (ansible_run_tags | default([]) | length == 1) and
+          ('step1' in (ansible_run_tags | default([]))) and
+          ('preflight' not in (ansible_run_tags | default([])))
+        )
 
   tasks:
     - name: "Step 1 | Rename contexts for east/west clusters"
@@ -24,12 +52,12 @@
       ansible.builtin.import_tasks: tasks/02_install_istioctl.yml
       tags: [step2]
 
-    - name: "Step 3 | Verify cluster connectivity"
-      ansible.builtin.import_tasks: tasks/03_verify_clusters.yml
+    - name: "Step 3 | Install operators on both clusters"
+      ansible.builtin.import_tasks: tasks/03_install_operators.yml
       tags: [step3]
 
-    - name: "Step 4 | Install operators on both clusters"
-      ansible.builtin.import_tasks: tasks/04_install_operators.yml
+    - name: "Step 4 | User workload monitoring"
+      ansible.builtin.import_tasks: tasks/04_user_workload_monitoring.yml
       tags: [step4]
 
     - name: "Step 5 | Create shared root CA"

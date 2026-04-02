@@ -1,0 +1,5 @@
+# Controller environment for ansible/ playbooks (use inside a venv — see README.md)
+ansible-core>=2.14
+kubernetes>=24.2.0
+PyYAML>=6.0
+jsonpatch>=1.32

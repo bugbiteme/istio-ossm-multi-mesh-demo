@@ -40,50 +40,68 @@
 # --- 5.1 Load root CA into cert-manager ---
 
 - name: "[5.1] Ensure istio-system namespace exists"
-  ansible.builtin.shell: |
-    oc --context="{{ ctx_east }}" create namespace istio-system \
-      --dry-run=client -o yaml | oc --context="{{ ctx_east }}" apply -f -
-  changed_when: true
+  kubernetes.core.k8s:
+    context: "{{ ctx_east }}"
+    definition:
+      apiVersion: v1
+      kind: Namespace
+      metadata:
+        name: istio-system
+    state: present
+    apply: true
   tags: [step5]
 
 - name: "[5.1] Create root-ca-secret in cert-manager"
-  ansible.builtin.shell: |
-    oc --context="{{ ctx_east }}" create secret tls root-ca-secret \
-      -n cert-manager \
-      --cert={{ repo_root }}/certs/root-ca.crt \
-      --key={{ repo_root }}/certs/root-ca.key \
-      --dry-run=client -o yaml | oc --context="{{ ctx_east }}" apply -f -
-  changed_when: true
+  kubernetes.core.k8s:
+    context: "{{ ctx_east }}"
+    definition:
+      apiVersion: v1
+      kind: Secret
+      metadata:
+        name: root-ca-secret
+        namespace: cert-manager
+      type: kubernetes.io/tls
+      stringData:
+        tls.crt: "{{ lookup('ansible.builtin.file', repo_root ~ '/certs/root-ca.crt') }}"
+        tls.key: "{{ lookup('ansible.builtin.file', repo_root ~ '/certs/root-ca.key') }}"
+    state: present
+    apply: true
   tags: [step5]
 
 - name: "[5.1] Apply ClusterIssuer"
-  ansible.builtin.command: >
-    oc --context="{{ ctx_east }}"
-    apply -f {{ repo_root }}/manifests/cert-manager/clusterissuer.yaml
-  changed_when: true
+  kubernetes.core.k8s:
+    context: "{{ ctx_east }}"
+    src: "{{ repo_root }}/manifests/cert-manager/clusterissuer.yaml"
+    state: present
+    apply: true
   tags: [step5]
 
 # --- 5.2 Issue intermediate CA certificate ---
 
 - name: "[5.2] Apply intermediate CA manifest"
-  ansible.builtin.command: >
-    oc --context="{{ ctx_east }}"
-    apply -f {{ repo_root }}/manifests/cert-manager/east-intermediate-ca.yaml
-  changed_when: true
+  kubernetes.core.k8s:
+    context: "{{ ctx_east }}"
+    src: "{{ repo_root }}/manifests/cert-manager/east-intermediate-ca.yaml"
+    state: present
+    apply: true
   tags: [step5]
 
 - name: "[5.2] Wait for cacerts secret to be populated"
-  ansible.builtin.command: >
-    oc --context="{{ ctx_east }}" get secret cacerts -n istio-system
-    -o jsonpath='{.data.ca\.crt}'
+  kubernetes.core.k8s_info:
+    context: "{{ ctx_east }}"
+    api_version: v1
+    kind: Secret
+    name: cacerts
+    namespace: istio-system
   register: cacerts
-  until: cacerts.stdout | length > 0
+  until: >
+    cacerts.resources | length > 0 and
+    (cacerts.resources[0].data['ca.crt'] | default('') | length) > 0
   retries: 20
   delay: 15
-  changed_when: false
   tags: [step5]
 
 - name: "[5.2] Confirm cacerts secret is present"
   ansible.builtin.debug:
-    msg: "cacerts: populated ({{ cacerts.stdout | length }} bytes base64)"
+    msg: "cacerts: populated ({{ cacerts.resources[0].data['ca.crt'] | default('') | length }} chars base64)"
   tags: [step5]

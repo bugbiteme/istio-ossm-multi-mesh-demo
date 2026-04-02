@@ -17,8 +17,7 @@ mesh_id: mesh1
 # Istio version for istioctl download
 istio_version: "1.27.5"
 
-# Repository root – two directory levels above this playbook
-repo_root: "{{ playbook_dir | dirname | dirname }}"
+# Repository root is set in site.yml (play vars).
 
 # Set to true to apply optional web-console notification banners
 apply_console_notifications: false
