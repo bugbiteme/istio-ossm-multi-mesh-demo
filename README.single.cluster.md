@@ -1,6 +1,7 @@
 # Single-Cluster Demo – Step-by-Step Instructions
 
 ---
+**Note**: Instructions to automate the following steps can be found in `ansible/README.md`
 
 ## 1. Rename context
 
