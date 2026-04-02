@@ -9,7 +9,9 @@ components:
     container:
       # Universal Developer Image — includes git, curl, kubectl, and common runtimes.
       # Swap for a custom image if you want tools pre-baked (faster cold starts).
-      image: quay.io/devfile/universal-developer-image:ubi9-latest
+      # image: quay.io/devfile/universal-developer-image:ubi9-latest
+      image: quay.io/devfile/universal-developer-image:ubi10-latest
+      
       memoryLimit: 4Gi
       memoryRequest: 512Mi
       cpuLimit: "2"
