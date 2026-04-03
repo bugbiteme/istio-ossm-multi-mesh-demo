@@ -111,7 +111,7 @@ commands:
         # Install claude-code globally via npm (goes into nvm's node_modules — persistent)
         if ! command -v claude &>/dev/null; then
           echo "→ Installing @anthropic-ai/claude-code..."
-          npm install -g @anthropic-ai/claude-code
+          curl -fsSL https://claude.ai/install.sh | bash
         else
           echo "✔ claude-code already installed"
         fi
@@ -239,7 +239,7 @@ commands:
         ([ ! -s "$NVM_DIR/nvm.sh" ] && curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash || true) && \
         source "$NVM_DIR/nvm.sh" && \
         (node --version 2>/dev/null | grep -q "^v24" || (nvm install 24 && nvm alias default 24)) && \
-        (command -v claude &>/dev/null || npm install -g @anthropic-ai/claude-code) && \
+        (command -v claude &>/dev/null || curl -fsSL https://claude.ai/install.sh | bash) && \
 
         echo "=== istioctl ===" && \
         (command -v istioctl &>/dev/null || (curl -sSL https://istio.io/downloadIstio | ISTIO_VERSION=1.27.5 sh - && mv istio-1.27.5/bin/istioctl "$HOME/.local/bin/" && rm -rf istio-1.27.5)) && \
