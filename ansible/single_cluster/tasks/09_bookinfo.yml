@@ -45,6 +45,16 @@
 
 # --- 9.3 Verify productpage ---
 
+- name: "[9.3] Wait for gateway hostname to resolve in DNS"
+  ansible.builtin.command: >
+    getent hosts {{ gateway_url.split(':')[0] }}
+  register: dns_check
+  until: dns_check.rc == 0
+  retries: 24
+  delay: 10
+  changed_when: false
+  tags: [step9]
+
 - name: "[9.3] Verify productpage returns the expected title"
   ansible.builtin.uri:
     url: "http://{{ gateway_url }}/productpage"
