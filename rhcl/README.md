@@ -23,14 +23,30 @@ oc config use-context admin-east
 ```bash
 oc apply -f rhcl/manifests/operators/
 ```
+This will install the Red Hat Connectivity Link Operator, which in turn, also automatically installs the following operators
+```
+NAME                                    DISPLAY                            
+authorino-operator.v1.3.x               Authorino Operator                 
+dns-operator.v1.3.x                     DNS Operator                       
+limitador-operator.v1.3.x               Limitador Operator                 
+rhcl-operator.v1.3.x                    Red Hat Connectivity Link          
+```
 
 Once installed, enable the RHCL console plugin via the OpenShift Web Console:
 
 ```
-Overview -> Dynamic Plugins -> View All
+Home -> Overview -> Dynamic Plugins -> View All
 ```
 
 Enable `kuadrant-console-plugin`.
+
+or via command line:
+
+```bash
+oc patch console.operator.openshift.io cluster \
+  --type=json \
+  -p '[{"op":"add","path":"/spec/plugins/-","value":"kuadrant-console-plugin"}]'
+```
 
 ---
 
