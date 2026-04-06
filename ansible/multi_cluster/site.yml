@@ -6,7 +6,8 @@
 #   ansible-playbook site.yml --tags step5        # run a single step
 #   ansible-playbook site.yml --skip-tags step2   # skip istioctl install (Dev Spaces)
 #
-# Available tags: preflight step1 step1_console step2 step3…step9 (API via preflight; step3=operators, step4=UWM)
+# Available tags: preflight step1 step1_console step2 step3…step9 (no separate “verify” step; see preflight)
+#   preflight = API checks for contexts that already exist in kubeconfig; step1_console = optional console banner (needs API)
 
 - name: Multi-Mesh Demo – Full Deployment
   hosts: localhost
@@ -15,14 +16,13 @@
   vars_files:
     - vars/main.yml
   vars:
+    # playbook_dir is unset/wrong while vars_files are templated; paths must use play vars.
     repo_root: "{{ (playbook_dir ~ '/../..') | realpath }}"
 
   pre_tasks:
-    # Skip when only step1: kubeconfig rename/switch only (west context may not exist yet).
-    - name: Preflight | OpenShift API reachability (east)
-      ansible.builtin.import_tasks: ../includes/preflight_oc_api.yml
-      vars:
-        preflight_oc_context: "{{ ctx_east }}"
+    # Skip when only step1: kubeconfig / oc login only (no API checks).
+    # If a named context is missing (fresh kubeconfig), skip that cluster’s API check until step1 created it.
+    - name: Preflight | East block (probe context + API when present)
       tags: [always, preflight]
       when: >
         not (
@@ -30,11 +30,20 @@
           ('step1' in (ansible_run_tags | default([]))) and
           ('preflight' not in (ansible_run_tags | default([])))
         )
+      block:
+        - name: Preflight | Probe east context presence
+          ansible.builtin.command: oc config get-contexts {{ ctx_east }}
+          register: preflight_probe_east
+          failed_when: false
+          changed_when: false
 
-    - name: Preflight | OpenShift API reachability (west)
-      ansible.builtin.import_tasks: ../includes/preflight_oc_api.yml
-      vars:
-        preflight_oc_context: "{{ ctx_west }}"
+        - name: Preflight | OpenShift API reachability (east)
+          ansible.builtin.import_tasks: ../includes/preflight_oc_api.yml
+          vars:
+            preflight_oc_context: "{{ ctx_east }}"
+          when: preflight_probe_east.rc == 0
+
+    - name: Preflight | West block (probe context + API when present)
       tags: [always, preflight]
       when: >
         not (
@@ -42,6 +51,18 @@
           ('step1' in (ansible_run_tags | default([]))) and
           ('preflight' not in (ansible_run_tags | default([])))
         )
+      block:
+        - name: Preflight | Probe west context presence
+          ansible.builtin.command: oc config get-contexts {{ ctx_west }}
+          register: preflight_probe_west
+          failed_when: false
+          changed_when: false
+
+        - name: Preflight | OpenShift API reachability (west)
+          ansible.builtin.import_tasks: ../includes/preflight_oc_api.yml
+          vars:
+            preflight_oc_context: "{{ ctx_west }}"
+          when: preflight_probe_west.rc == 0
 
   tasks:
     - name: "Step 1 | Rename contexts for east/west clusters"

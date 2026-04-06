@@ -1,6 +1,9 @@
 ---
-# Step 1: Rename contexts for east/west clusters
-# Pre-requisite: log into each cluster with `oc login` before running this step.
+# Step 1: Ensure east/west contexts exist in kubeconfig
+#
+# If `admin-east` / `admin-west` are missing, the playbook runs `oc login` using
+# multi_cluster_* values (from OSSM_MULTI_* environment variables or -e); then
+# renames the new context to the stable names in vars/main.yml.
 
 # --- 1.1 East cluster ---
 
@@ -9,6 +12,29 @@
   register: east_ctx_check
   failed_when: false
   changed_when: false
+  tags: [step1]
+
+- name: "[1.1] Require east cluster credentials when kubeconfig lacks {{ ctx_east }}"
+  ansible.builtin.assert:
+    that:
+      - multi_cluster_east_api | default('', true) | string | length > 0
+      - multi_cluster_east_user | default('', true) | string | length > 0
+      - multi_cluster_east_password | default('', true) | string | length > 0
+    fail_msg: >-
+      Target context {{ ctx_east }} is not in kubeconfig. Export OSSM_MULTI_EAST_API,
+      OSSM_MULTI_EAST_USER, and OSSM_MULTI_EAST_PASSWORD (or pass -e multi_cluster_east_*), then re-run --tags step1.
+  when: east_ctx_check.rc != 0
+  tags: [step1]
+
+- name: "[1.1] Log into east cluster API"
+  ansible.builtin.command:
+    argv: "{{ _east_login_argv }}"
+  vars:
+    _east_login_base: "{{ ['oc', 'login', multi_cluster_east_api, '-u', multi_cluster_east_user, '-p', multi_cluster_east_password] }}"
+    _east_login_argv: "{{ _east_login_base + (['--insecure-skip-tls-verify=true'] if multi_cluster_oc_login_insecure_skip_tls_verify | bool else []) }}"
+  no_log: true
+  when: east_ctx_check.rc != 0
+  changed_when: true
   tags: [step1]
 
 - name: "[1.1] Get current context to rename (east)"
@@ -29,6 +55,7 @@
   changed_when: true
   tags: [step1]
 
+# Not tagged step1: needs a reachable API (VPN/DNS). Run with --tags step1_console when ready.
 - name: "[1.1] Apply east console notification banner (optional)"
   ansible.builtin.command: >
     oc --context="{{ ctx_east }}"
@@ -39,22 +66,34 @@
 
 # --- 1.2 West cluster ---
 
-- name: "[1.2] Pause – log into the west cluster before continuing"
-  ansible.builtin.pause:
-    prompt: |
-
-      ACTION REQUIRED
-      ---------------
-      Log into the WEST OpenShift cluster now (oc login ...).
-      The current context will be renamed to '{{ ctx_west }}'.
-      Press Enter when ready.
-  tags: [step1]
-
 - name: "[1.2] Check whether west context already exists"
   ansible.builtin.command: oc config get-contexts {{ ctx_west }}
   register: west_ctx_check
   failed_when: false
   changed_when: false
+  tags: [step1]
+
+- name: "[1.2] Require west cluster credentials when kubeconfig lacks {{ ctx_west }}"
+  ansible.builtin.assert:
+    that:
+      - multi_cluster_west_api | default('', true) | string | length > 0
+      - multi_cluster_west_user | default('', true) | string | length > 0
+      - multi_cluster_west_password | default('', true) | string | length > 0
+    fail_msg: >-
+      Target context {{ ctx_west }} is not in kubeconfig. Export OSSM_MULTI_WEST_API,
+      OSSM_MULTI_WEST_USER, and OSSM_MULTI_WEST_PASSWORD (or pass -e multi_cluster_west_*), then re-run --tags step1.
+  when: west_ctx_check.rc != 0
+  tags: [step1]
+
+- name: "[1.2] Log into west cluster API"
+  ansible.builtin.command:
+    argv: "{{ _west_login_argv }}"
+  vars:
+    _west_login_base: "{{ ['oc', 'login', multi_cluster_west_api, '-u', multi_cluster_west_user, '-p', multi_cluster_west_password] }}"
+    _west_login_argv: "{{ _west_login_base + (['--insecure-skip-tls-verify=true'] if multi_cluster_oc_login_insecure_skip_tls_verify | bool else []) }}"
+  no_log: true
+  when: west_ctx_check.rc != 0
+  changed_when: true
   tags: [step1]
 
 - name: "[1.2] Get current context to rename (west)"
@@ -75,6 +114,7 @@
   changed_when: true
   tags: [step1]
 
+# Not tagged step1: needs a reachable API (VPN/DNS). Run with --tags step1_console when ready.
 - name: "[1.2] Apply west console notification banner (optional)"
   ansible.builtin.command: >
     oc --context="{{ ctx_west }}"

@@ -3,6 +3,23 @@
 ctx_east: admin-east
 ctx_west: admin-west
 
+# Step 1: when a target context is missing from kubeconfig, the playbook runs
+# `oc login` using these values. Prefer exporting the OSSM_MULTI_* environment
+# variables on the controller host (see ansible/README.md). You can override
+# the multi_cluster_* variables with -e instead if needed.
+multi_cluster_east_api: "{{ lookup('env', 'OSSM_MULTI_EAST_API') | default('', true) }}"
+multi_cluster_east_user: "{{ lookup('env', 'OSSM_MULTI_EAST_USER') | default('', true) }}"
+multi_cluster_east_password: "{{ lookup('env', 'OSSM_MULTI_EAST_PASSWORD') | default('', true) }}"
+multi_cluster_west_api: "{{ lookup('env', 'OSSM_MULTI_WEST_API') | default('', true) }}"
+multi_cluster_west_user: "{{ lookup('env', 'OSSM_MULTI_WEST_USER') | default('', true) }}"
+multi_cluster_west_password: "{{ lookup('env', 'OSSM_MULTI_WEST_PASSWORD') | default('', true) }}"
+
+# Lab clusters with untrusted API certs: set true in extra-vars, or export
+# OSSM_MULTI_OC_LOGIN_INSECURE_SKIP_TLS_VERIFY=1
+multi_cluster_oc_login_insecure_skip_tls_verify: >-
+  {{ (lookup('env', 'OSSM_MULTI_OC_LOGIN_INSECURE_SKIP_TLS_VERIFY') | default('', true) | lower | trim)
+     in ['1', 'true', 'yes'] }}
+
 # Cluster names used when creating remote secrets
 east_cluster: cluster-east
 west_cluster: cluster-west
@@ -17,7 +34,7 @@ mesh_id: mesh1
 # Istio version for istioctl download
 istio_version: "1.27.5"
 
-# Repository root is set in site.yml (play vars).
+# Repository root is set in site.yml (play vars); playbook_dir is unset/wrong while vars_files are templated.
 
 # Set to true to apply optional web-console notification banners
 apply_console_notifications: false
