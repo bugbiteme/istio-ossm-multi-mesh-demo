@@ -53,10 +53,36 @@ ansible/
 
 - `oc` CLI installed on the Ansible controller
 - **Single-cluster** (`ansible/single_cluster`): log into the target cluster with `oc login` before running the playbook (step 1 renames the current context to `ctx_east`).
-- **Multi-cluster** (`ansible/multi_cluster`): step 1 can create both contexts via `oc login` using environment variables (see **Multi-cluster credentials** below). Later steps still use `oc` / `istioctl` with those context names (for example multi-cluster step 7.5).
+- **Multi-cluster** (`ansible/multi_cluster`): log into **both** the east and west clusters and set kubeconfig contexts **`admin-east`** and **`admin-west`** *before* you run the playbook (see **Multi-cluster kubeconfig** below). The playbook does **not** run `oc login` for you; step 1 only verifies those contexts exist and optionally applies console banners.
 - `kubectl` or `kustomize` on the controller host (used by the `kubernetes.core.kustomize` lookup to render `-k` overlays)
 - Python 3.10+ (3.11+ recommended) for a local **virtual environment** on the machine that runs Ansible
 - `become` (sudo) access on that host for the `istioctl` install step (step 2), unless you skip it
+
+### Multi-cluster kubeconfig (east and west)
+
+From the repository root (or adjust paths), configure **both** clusters so `oc config get-contexts admin-east` and `oc config get-contexts admin-west` succeed. This mirrors [README.md](../README.md) §1 *Rename contexts for east/west clusters*, **without** the optional `console-notification.yaml` apply (the playbook can still apply banners in step 1 if `apply_console_notifications` is `true`).
+
+**East cluster** — after `oc login` to the east API:
+
+```bash
+oc config current-context
+
+oc config rename-context $(oc config current-context) admin-east
+
+oc config use-context admin-east
+```
+
+**West cluster** — after `oc login` to the west API:
+
+```bash
+oc config current-context
+
+oc config rename-context $(oc config current-context) admin-west
+
+oc config use-context admin-west
+```
+
+Then run Ansible from `ansible/multi_cluster/` as usual. If a context name already exists, adjust the `rename-context` source name or merge kubeconfigs as needed.
 
 ---
 
@@ -119,8 +145,7 @@ If you prefer not to use a venv, install the same packages with `pip install --u
 | Tag | Step |
 |---|---|
 | `preflight` | Only API/kubeconfig checks (`includes/preflight_oc_api.yml`); use `ansible-playbook site.yml --tags preflight` |
-| `step1` | Rename cluster context(s) (kubeconfig only; no cluster API required) |
-| `step1_console` | Optional OpenShift console notification manifests (`apply_console_notifications` must be `true`; requires VPN/DNS and a reachable API) |
+| `step1` | **Single:** rename current context to `ctx_east` if needed. **Multi:** require `admin-east` / `admin-west` in kubeconfig (README §1.1–1.2). Both: optional console banners when `apply_console_notifications` is `true` (best-effort `oc apply`; API must be reachable from the controller) |
 | `step2` | Install `istioctl` |
 | `step3` | Install operators (Subscriptions / CSVs in `openshift-operators`) |
 | `step4` | Enable user workload monitoring + wait for `prometheus-user-workload` |
@@ -143,36 +168,9 @@ ansible-playbook site.yml --tags step3
 
 Steps assume earlier steps have already succeeded on the cluster (for example, **step8** expects the Tempo signing secret from **step6**, and **step9** expects the ingress **Gateway** from **step7**). To re-run a later step after a failure, either run the missing earlier steps again or fix the cluster by hand to match what those steps would have created.
 
-**Step 1 split:** `--tags step1` only updates kubeconfig (rename / `use-context`). The console banner is **`step1_console`** and calls `oc apply`; if you see `no such host` for the API URL, connect VPN (or fix DNS) before that tag, or leave `apply_console_notifications: false` and skip it. A full `ansible-playbook site.yml` (no `--tags`) still runs the banner when the flag is true.
+**Step 1 and console banners:** Banners are part of **`step1`** and run only when **`apply_console_notifications`** is **`true`**. Set it to **`false`** to skip them entirely. When the flag is true, **`oc apply`** for the banner is **best-effort**: if the API is unreachable from the controller (DNS, routing, firewall, expired credentials, cluster gone), step 1 still **succeeds** after kubeconfig work and Ansible prints a **warning** with `oc`’s stderr; re-run **`--tags step1`** after the API responds (for example `oc cluster-info` for that context), or turn the flag off.
 
-**API preflight:** Before other steps, plays run `oc cluster-info` with retries, tagged **`always`** and **`preflight`**. It runs automatically with `--tags step5`, full playbooks, etc. It is **skipped** only when you pass **exactly** `--tags step1` (kubeconfig-only work). To **only** run preflight: `ansible-playbook site.yml --tags preflight` from `single_cluster/` or `multi_cluster/`. **Single-cluster** preflight uses the **current** kubeconfig context (`oc cluster-info` with no `--context`) so it still works before step 1 renames the context to `ctx_east`. **Multi-cluster** preflight runs **`oc cluster-info`** for **`ctx_east`** and **`ctx_west`** only when each context **already exists** in kubeconfig (so a full playbook run can start from an empty kubeconfig: preflight skips API checks until after step 1 adds both contexts).
-
-### Multi-cluster credentials (step 1)
-
-When `admin-east` or `admin-west` is missing from kubeconfig, the multi-cluster playbook runs `oc login` for that cluster. Set these on the controller (or override the `multi_cluster_*` variables with `-e`):
-
-| Variable | Environment variable | Purpose |
-|---|---|---|
-| `multi_cluster_east_api` | `OSSM_MULTI_EAST_API` | East API URL (for example `https://api.cluster-east.example.com:6443`) |
-| `multi_cluster_east_user` | `OSSM_MULTI_EAST_USER` | East cluster username |
-| `multi_cluster_east_password` | `OSSM_MULTI_EAST_PASSWORD` | East cluster password |
-| `multi_cluster_west_api` | `OSSM_MULTI_WEST_API` | West API URL |
-| `multi_cluster_west_user` | `OSSM_MULTI_WEST_USER` | West cluster username |
-| `multi_cluster_west_password` | `OSSM_MULTI_WEST_PASSWORD` | West cluster password |
-
-Optional: self-signed or untrusted API certificates — export `OSSM_MULTI_OC_LOGIN_INSECURE_SKIP_TLS_VERIFY=1` or pass `-e multi_cluster_oc_login_insecure_skip_tls_verify=true` so `oc login` uses `--insecure-skip-tls-verify=true`. Login tasks use `no_log` to avoid printing passwords; avoid extra `-v` on step 1 if you are sensitive to leakage in argv on the controller.
-
-Example:
-
-```bash
-export OSSM_MULTI_EAST_API='https://api.east.example.com:6443'
-export OSSM_MULTI_EAST_USER='kubeadmin'
-export OSSM_MULTI_EAST_PASSWORD='…'
-export OSSM_MULTI_WEST_API='https://api.west.example.com:6443'
-export OSSM_MULTI_WEST_USER='kubeadmin'
-export OSSM_MULTI_WEST_PASSWORD='…'
-cd ansible/multi_cluster && ansible-playbook site.yml --tags step1
-```
+**API preflight:** Before other steps, plays run `oc cluster-info` with retries, tagged **`always`** and **`preflight`**. It runs automatically with `--tags step5`, full playbooks, etc. It is **skipped** when you pass **only** `--tags step1` (no `preflight` in the list), so step 1 is not blocked by API checks up front. To **only** run preflight: `ansible-playbook site.yml --tags preflight` from `single_cluster/` or `multi_cluster/`. **Single-cluster** preflight uses the **current** kubeconfig context (`oc cluster-info` with no `--context`) so it still works before step 1 renames the context to `ctx_east`. **Multi-cluster** preflight runs **`oc cluster-info`** for **`ctx_east`** and **`ctx_west`** only when each context **already exists** in kubeconfig (if a context is missing, that cluster’s preflight is skipped and **step 1** fails with a message pointing at the repository README).
 
 **Useful skips**
 
@@ -191,9 +189,7 @@ All tuneable values are in `vars/main.yml`. Key variables:
 | `east_cluster` | `cluster-east` | East cluster name for remote secrets |
 | `west_cluster` | `cluster-west` | West cluster name for remote secrets *(multi only)* |
 | `istio_version` | `1.27.5` | Istio version to download for `istioctl` |
-| `apply_console_notifications` | `false` | Apply optional OCP web console banner |
-| `multi_cluster_east_*` / `multi_cluster_west_*` | *(from env)* | API URL, user, password for `oc login` when the east/west context is missing *(multi_cluster only; see **Multi-cluster credentials**)* |
-| `multi_cluster_oc_login_insecure_skip_tls_verify` | `false` *(or env `OSSM_MULTI_OC_LOGIN_INSECURE_SKIP_TLS_VERIFY`)* | Pass `--insecure-skip-tls-verify=true` to `oc login` *(multi_cluster only)* |
+| `apply_console_notifications` | `true` in repo `vars/main.yml` | Apply optional OCP web console banners in step 1 (best-effort); set `false` to skip |
 | `start_load_generators` | `false` | Auto-start `loadgen-web.sh` and `loadgen-api.sh` |
 
 ---
@@ -205,8 +201,8 @@ All tuneable values are in `vars/main.yml`. Key variables:
 | **Kubernetes API** | `kubernetes.core.k8s` / `k8s_info` with kubeconfig context; kustomize via `lookup('kubernetes.core.kustomize', dir=…)` (**`dir=`** is required — positional terms are ignored by the plugin) |
 | **Idempotency** | Server-side `apply` via the collection; `creates:` guard for local certificate generation |
 | **Waiting** | `k8s_info` with `until` for CSVs, StatefulSets, gateways, etc.; `oc wait --for=condition=Ready pod --all -n tracing-system` after tracing apply; `oc`/`istioctl` where the collection does not fit |
-| **API reachability** | `pre_tasks` import `includes/preflight_oc_api.yml` (`oc cluster-info`, retried) before steps other than kubeconfig-only `step1`; single-cluster uses current context, multi-cluster uses `ctx_east` / `ctx_west` |
-| **Context rename** | Checks whether the target context name already exists before renaming; **multi-cluster** step 1 runs `oc login` from `OSSM_MULTI_*` (or `-e multi_cluster_*`) when a context is missing, then renames it to `ctx_east` / `ctx_west` |
+| **API reachability** | `pre_tasks` import `includes/preflight_oc_api.yml` (`oc cluster-info`, retried) before steps other than `--tags step1` without `preflight`; single-cluster uses current context, multi-cluster uses `ctx_east` / `ctx_west` |
+| **Kubeconfig (multi)** | **Multi-cluster** step 1 **requires** contexts `ctx_east` / `ctx_west` to exist (repository README §1.1–1.2); **single-cluster** step 1 renames the current context to `ctx_east` when missing |
 | **Root CA** | `stat` check skips key and certificate generation if files already exist |
 | **Load generators** | Not started automatically — set `start_load_generators: true` in `vars/main.yml` or run the scripts manually |
 | **Dev Spaces** | Skip `istioctl` install with `--skip-tags step2`; API checks come from **preflight** |

@@ -6,8 +6,9 @@
 #   ansible-playbook site.yml --tags step5        # run a single step
 #   ansible-playbook site.yml --skip-tags step2   # skip istioctl install (Dev Spaces)
 #
-# Available tags: preflight step1 step1_console step2 step3…step9 (no separate “verify” step; see preflight)
-#   preflight = API checks for contexts that already exist in kubeconfig; step1_console = optional console banner (needs API)
+# Available tags: preflight step1 step2 step3…step9 (no separate “verify” step; see preflight)
+#   preflight = API checks for contexts that already exist in kubeconfig
+#   step1 = require admin-east / admin-west in kubeconfig (README §1.1–1.2) + optional console banners
 
 - name: Multi-Mesh Demo – Full Deployment
   hosts: localhost
@@ -18,18 +19,20 @@
   vars:
     # playbook_dir is unset/wrong while vars_files are templated; paths must use play vars.
     repo_root: "{{ (playbook_dir ~ '/../..') | realpath }}"
+    # Skip API preflight when the run is limited to step1 only (no explicit preflight tag).
+    skip_preflight_step1_family: >-
+      {{
+        ('preflight' not in (ansible_run_tags | default([])))
+        and ((ansible_run_tags | default([])) | length > 0)
+        and (((ansible_run_tags | default([])) | difference(['step1'])) | length == 0)
+      }}
 
   pre_tasks:
-    # Skip when only step1: kubeconfig / oc login only (no API checks).
-    # If a named context is missing (fresh kubeconfig), skip that cluster’s API check until step1 created it.
+    # Skip kubeconfig-only / console-banner-only runs (no API checks) unless --tags preflight.
+    # If a named context is missing, skip that cluster’s API check (step 1 will fail fast with README pointers).
     - name: Preflight | East block (probe context + API when present)
       tags: [always, preflight]
-      when: >
-        not (
-          (ansible_run_tags | default([]) | length == 1) and
-          ('step1' in (ansible_run_tags | default([]))) and
-          ('preflight' not in (ansible_run_tags | default([])))
-        )
+      when: not (skip_preflight_step1_family | bool)
       block:
         - name: Preflight | Probe east context presence
           ansible.builtin.command: oc config get-contexts {{ ctx_east }}
@@ -45,12 +48,7 @@
 
     - name: Preflight | West block (probe context + API when present)
       tags: [always, preflight]
-      when: >
-        not (
-          (ansible_run_tags | default([]) | length == 1) and
-          ('step1' in (ansible_run_tags | default([]))) and
-          ('preflight' not in (ansible_run_tags | default([])))
-        )
+      when: not (skip_preflight_step1_family | bool)
       block:
         - name: Preflight | Probe west context presence
           ansible.builtin.command: oc config get-contexts {{ ctx_west }}
@@ -65,7 +63,7 @@
           when: preflight_probe_west.rc == 0
 
   tasks:
-    - name: "Step 1 | Rename contexts for east/west clusters"
+    - name: "Step 1 | Verify kubeconfig contexts (east/west) and optional console banners"
       ansible.builtin.import_tasks: tasks/01_rename_contexts.yml
       tags: [step1]
 

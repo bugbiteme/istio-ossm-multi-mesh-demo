@@ -5,9 +5,9 @@ metadata:
 spec:
   text: "Cluster West — Test | EU-West-1"
   location: BannerTop
-  color: "#008000"
+  color: "#FFFFFF"
   # GREEN
-  backgroundColor: "#EE0000"
+  backgroundColor: "#3E8635"
   # #008000 — web/HTML green
   # #3E8635 — Red Hat success green
   

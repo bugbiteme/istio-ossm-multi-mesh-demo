@@ -1,53 +1,25 @@
 ---
-# Step 1: Ensure east/west contexts exist in kubeconfig
-#
-# If `admin-east` / `admin-west` are missing, the playbook runs `oc login` using
-# multi_cluster_* values (from OSSM_MULTI_* environment variables or -e); then
-# renames the new context to the stable names in vars/main.yml.
+# Step 1: Expect kubeconfig contexts {{ ctx_east }} and {{ ctx_west }} to exist.
+# Follow the repository README (§1.1 East cluster, §1.2 West cluster): log into each
+# cluster, rename contexts to admin-east / admin-west, then run this playbook.
 
 # --- 1.1 East cluster ---
 
-- name: "[1.1] Check whether east context already exists"
+- name: "[1.1] Check kubeconfig context {{ ctx_east }}"
   ansible.builtin.command: oc config get-contexts {{ ctx_east }}
   register: east_ctx_check
-  failed_when: false
   changed_when: false
+  failed_when: false
   tags: [step1]
 
-- name: "[1.1] Require east cluster credentials when kubeconfig lacks {{ ctx_east }}"
+- name: "[1.1] Require kubeconfig context (see README §1.1): {{ ctx_east }}"
   ansible.builtin.assert:
     that:
-      - multi_cluster_east_api | default('', true) | string | length > 0
-      - multi_cluster_east_user | default('', true) | string | length > 0
-      - multi_cluster_east_password | default('', true) | string | length > 0
+      - east_ctx_check.rc == 0
     fail_msg: >-
-      Target context {{ ctx_east }} is not in kubeconfig. Export OSSM_MULTI_EAST_API,
-      OSSM_MULTI_EAST_USER, and OSSM_MULTI_EAST_PASSWORD (or pass -e multi_cluster_east_*), then re-run --tags step1.
-  when: east_ctx_check.rc != 0
-  tags: [step1]
-
-- name: "[1.1] Log into east cluster API"
-  ansible.builtin.command:
-    argv: "{{ _east_login_argv }}"
-  vars:
-    _east_login_base: "{{ ['oc', 'login', multi_cluster_east_api, '-u', multi_cluster_east_user, '-p', multi_cluster_east_password] }}"
-    _east_login_argv: "{{ _east_login_base + (['--insecure-skip-tls-verify=true'] if multi_cluster_oc_login_insecure_skip_tls_verify | bool else []) }}"
-  no_log: true
-  when: east_ctx_check.rc != 0
-  changed_when: true
-  tags: [step1]
-
-- name: "[1.1] Get current context to rename (east)"
-  ansible.builtin.command: oc config current-context
-  register: current_ctx_east
-  changed_when: false
-  when: east_ctx_check.rc != 0
-  tags: [step1]
-
-- name: "[1.1] Rename current context to {{ ctx_east }}"
-  ansible.builtin.command: "oc config rename-context {{ current_ctx_east.stdout | trim }} {{ ctx_east }}"
-  when: east_ctx_check.rc != 0
-  changed_when: true
+      Context {{ ctx_east }} is missing from kubeconfig. Log into the east cluster,
+      run oc config rename-context on the current context to {{ ctx_east }}, then re-run
+      (see repository README.md §1.1 East cluster).
   tags: [step1]
 
 - name: "[1.1] Switch active context to {{ ctx_east }}"
@@ -55,58 +27,49 @@
   changed_when: true
   tags: [step1]
 
-# Not tagged step1: needs a reachable API (VPN/DNS). Run with --tags step1_console when ready.
+# Skipped when apply_console_notifications is false. Best-effort: does not fail step1 if API is unreachable.
 - name: "[1.1] Apply east console notification banner (optional)"
   ansible.builtin.command: >
     oc --context="{{ ctx_east }}"
     apply -f {{ repo_root }}/manifests/cluster/east/console-notification.yaml
   when: apply_console_notifications | bool
-  changed_when: true
-  tags: [step1_console]
+  register: east_console_banner
+  failed_when: false
+  changed_when: east_console_banner.rc == 0
+  tags: [step1]
+
+- name: "[1.1] Warn when east console banner was not applied"
+  ansible.builtin.debug:
+    msg:
+      - "East console notification was not applied (oc apply rc={{ east_console_banner.rc | default('n/a') }})."
+      - >-
+          Ensure the API in kubeconfig is reachable from this host
+          (e.g. oc --context={{ ctx_east }} cluster-info), then re-run --tags step1,
+          or set apply_console_notifications: false.
+      - "stderr: {{ (east_console_banner.stderr | default('')) | trim }}"
+  when:
+    - apply_console_notifications | bool
+    - not (east_console_banner.skipped | default(false))
+    - (east_console_banner.rc | default(-1)) != 0
+  tags: [step1]
 
 # --- 1.2 West cluster ---
 
-- name: "[1.2] Check whether west context already exists"
+- name: "[1.2] Check kubeconfig context {{ ctx_west }}"
   ansible.builtin.command: oc config get-contexts {{ ctx_west }}
   register: west_ctx_check
-  failed_when: false
   changed_when: false
+  failed_when: false
   tags: [step1]
 
-- name: "[1.2] Require west cluster credentials when kubeconfig lacks {{ ctx_west }}"
+- name: "[1.2] Require kubeconfig context (see README §1.2): {{ ctx_west }}"
   ansible.builtin.assert:
     that:
-      - multi_cluster_west_api | default('', true) | string | length > 0
-      - multi_cluster_west_user | default('', true) | string | length > 0
-      - multi_cluster_west_password | default('', true) | string | length > 0
+      - west_ctx_check.rc == 0
     fail_msg: >-
-      Target context {{ ctx_west }} is not in kubeconfig. Export OSSM_MULTI_WEST_API,
-      OSSM_MULTI_WEST_USER, and OSSM_MULTI_WEST_PASSWORD (or pass -e multi_cluster_west_*), then re-run --tags step1.
-  when: west_ctx_check.rc != 0
-  tags: [step1]
-
-- name: "[1.2] Log into west cluster API"
-  ansible.builtin.command:
-    argv: "{{ _west_login_argv }}"
-  vars:
-    _west_login_base: "{{ ['oc', 'login', multi_cluster_west_api, '-u', multi_cluster_west_user, '-p', multi_cluster_west_password] }}"
-    _west_login_argv: "{{ _west_login_base + (['--insecure-skip-tls-verify=true'] if multi_cluster_oc_login_insecure_skip_tls_verify | bool else []) }}"
-  no_log: true
-  when: west_ctx_check.rc != 0
-  changed_when: true
-  tags: [step1]
-
-- name: "[1.2] Get current context to rename (west)"
-  ansible.builtin.command: oc config current-context
-  register: current_ctx_west
-  changed_when: false
-  when: west_ctx_check.rc != 0
-  tags: [step1]
-
-- name: "[1.2] Rename current context to {{ ctx_west }}"
-  ansible.builtin.command: "oc config rename-context {{ current_ctx_west.stdout | trim }} {{ ctx_west }}"
-  when: west_ctx_check.rc != 0
-  changed_when: true
+      Context {{ ctx_west }} is missing from kubeconfig. Log into the west cluster,
+      run oc config rename-context on the current context to {{ ctx_west }}, then re-run
+      (see repository README.md §1.2 West cluster).
   tags: [step1]
 
 - name: "[1.2] Switch active context to {{ ctx_west }}"
@@ -114,11 +77,28 @@
   changed_when: true
   tags: [step1]
 
-# Not tagged step1: needs a reachable API (VPN/DNS). Run with --tags step1_console when ready.
+# Skipped when apply_console_notifications is false. Best-effort: does not fail step1 if API is unreachable.
 - name: "[1.2] Apply west console notification banner (optional)"
   ansible.builtin.command: >
     oc --context="{{ ctx_west }}"
     apply -f {{ repo_root }}/manifests/cluster/west/console-notification.yaml
   when: apply_console_notifications | bool
-  changed_when: true
-  tags: [step1_console]
+  register: west_console_banner
+  failed_when: false
+  changed_when: west_console_banner.rc == 0
+  tags: [step1]
+
+- name: "[1.2] Warn when west console banner was not applied"
+  ansible.builtin.debug:
+    msg:
+      - "West console notification was not applied (oc apply rc={{ west_console_banner.rc | default('n/a') }})."
+      - >-
+          Ensure the API in kubeconfig is reachable from this host
+          (e.g. oc --context={{ ctx_west }} cluster-info), then re-run --tags step1,
+          or set apply_console_notifications: false.
+      - "stderr: {{ (west_console_banner.stderr | default('')) | trim }}"
+  when:
+    - apply_console_notifications | bool
+    - not (west_console_banner.skipped | default(false))
+    - (west_console_banner.rc | default(-1)) != 0
+  tags: [step1]

@@ -17,16 +17,35 @@
     apply: true
   tags: [step6]
 
-- name: "[6.1] Wait for all pods Ready in tracing-system (east)"
-  ansible.builtin.command: >
-    oc --context="{{ ctx_east }}"
-    wait --for=condition=Ready pod --all -n tracing-system --timeout=600s
+# Avoid `oc wait pod --all`: during Deployments/STS rollouts, pod names disappear and wait fails with NotFound.
+- name: "[6.1] Wait for tracing-system rollouts complete (east)"
+  ansible.builtin.shell: |
+    set -euo pipefail
+    ctx="{{ ctx_east }}"
+    ns=tracing-system
+    oc --context="$ctx" get deploy -n "$ns" -o name | while read -r res; do
+      oc --context="$ctx" rollout status "$res" -n "$ns" --timeout=600s
+    done
+    oc --context="$ctx" get sts -n "$ns" -o name | while read -r res; do
+      oc --context="$ctx" rollout status "$res" -n "$ns" --timeout=600s
+    done
+  args:
+    executable: /bin/bash
   changed_when: false
   tags: [step6]
 
-- name: "[6.1] Wait for all pods Ready in tracing-system (west)"
-  ansible.builtin.command: >
-    oc --context="{{ ctx_west }}"
-    wait --for=condition=Ready pod --all -n tracing-system --timeout=600s
+- name: "[6.1] Wait for tracing-system rollouts complete (west)"
+  ansible.builtin.shell: |
+    set -euo pipefail
+    ctx="{{ ctx_west }}"
+    ns=tracing-system
+    oc --context="$ctx" get deploy -n "$ns" -o name | while read -r res; do
+      oc --context="$ctx" rollout status "$res" -n "$ns" --timeout=600s
+    done
+    oc --context="$ctx" get sts -n "$ns" -o name | while read -r res; do
+      oc --context="$ctx" rollout status "$res" -n "$ns" --timeout=600s
+    done
+  args:
+    executable: /bin/bash
   changed_when: false
   tags: [step6]
