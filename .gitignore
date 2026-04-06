@@ -10,3 +10,4 @@ __pycache__/
 *$py.class
 
 # Credentials
+ansible/multi_cluster/env.sh
