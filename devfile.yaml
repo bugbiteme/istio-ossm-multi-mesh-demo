@@ -20,10 +20,10 @@ components:
 
       env:
         # Git identity — used by the configure-git postStart command
-        # - name: GIT_USER_EMAIL
-        #   value: "leon.s.levy@gmail.com"
-        # - name: GIT_USER_NAME
-        #   value: "bugbiteme"
+        - name: GIT_USER_EMAIL
+          value: "leon.s.levy@gmail.com"
+        - name: GIT_USER_NAME
+          value: "bugbiteme"
 
         # Ensure $HOME/.local/bin and nvm-managed node are on PATH
         - name: PATH
