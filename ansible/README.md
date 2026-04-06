@@ -2,6 +2,8 @@
 
 Two modular playbooks that automate the full deployment described in the project READMEs.
 
+*
+
 | Playbook | Covers |
 |---|---|
 | `multi_cluster/` | [README.md](../README.md) – two-cluster mesh with east-west federation |
