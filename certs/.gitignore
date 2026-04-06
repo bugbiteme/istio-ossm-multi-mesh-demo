@@ -1,5 +1,5 @@
 # Never commit private keys or CSRs
 *.key
 *.csr
-root-ca.crt
-ca.crt
+*.crt
+ca*.crt

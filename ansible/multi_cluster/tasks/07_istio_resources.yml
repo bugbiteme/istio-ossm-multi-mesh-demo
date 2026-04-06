@@ -255,7 +255,8 @@
     set -o pipefail
     istioctl create-remote-secret \
       --context="{{ ctx_west }}" \
-      --name="{{ west_cluster }}" | \
+      --name="{{ west_cluster }}" \
+      --namespace=istio-system | \
       oc --context="{{ ctx_east }}" apply -n istio-system -f -
   args:
     executable: /bin/bash
@@ -267,7 +268,8 @@
     set -o pipefail
     istioctl create-remote-secret \
       --context="{{ ctx_east }}" \
-      --name="{{ east_cluster }}" | \
+      --name="{{ east_cluster }}" \
+      --namespace=istio-system | \
       oc --context="{{ ctx_west }}" apply -n istio-system -f -
   args:
     executable: /bin/bash
