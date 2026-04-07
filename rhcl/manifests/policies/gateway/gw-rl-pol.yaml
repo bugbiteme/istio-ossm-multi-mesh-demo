@@ -1,0 +1,16 @@
+apiVersion: kuadrant.io/v1
+kind: RateLimitPolicy
+metadata:
+  name: prod-gateway-rlp
+  namespace: ingress-gateway
+spec:
+  targetRef:
+    group: gateway.networking.k8s.io
+    kind: Gateway
+    name: prod-gateway
+  defaults:
+    limits:
+      "low-limit":
+        rates:
+        - limit: 5
+          window: 10s

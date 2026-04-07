@@ -155,10 +155,10 @@ Wait for the ClusterIssuer to become ready
 oc wait clusterissuer/letsencrypt --for=condition=ready=true
 ```
 
-Create the RHCL enabled gateway
+Create the RHCL enabled gateway (**Note** update with your domain)
 
 ```bash
-envsubst < manifests/ingress-gateway/rhcl/gateway.yaml | oc apply -f -
+oc apply -f manifests/ingress-gateway/rhcl/gateway.yaml
 ```
 **Note** The secret (`api-prod-gateway-tls`)contained in the above CR doesn't exist yet. It will be created automatically by `cert-manager` when you apply a `TLSPolicy` that targets this `Gateway` — so the order of operations matters.
 
@@ -170,7 +170,7 @@ oc -n ingress-gateway get gateway prod-gateway -o=jsonpath='{.status.conditions[
 expected output:
 ```
 Resource accepted
-Resource programmed, assigned to service(s) prod-gateway-istio.ingress-gateway.svc.cluster.local:443
+Resource programmed, assigned to service(s) prod-gateway-istio.ingress-gateway.svc.cluster.local:443 and prod-gateway-istio.ingress-gateway.svc.cluster.local:80
 ```
 
 at this point 
@@ -193,6 +193,55 @@ oc -n ingress-gateway apply -f rhcl/manifests/tls-setup/tls-policy.yaml
 Check that your TLS policy has an Accepted and Enforced status
 
 ```bash
-oc get tlspolicy ${KUADRANT_GATEWAY_NAME}-tls -n ${KUADRANT_GATEWAY_NS} -o=jsonpath='{.status.conditions[?(@.type=="Accepted")].message}{"\n"}{.status.conditions[?(@.type=="Enforced")].message}'
+oc -n ingress-gateway get tlspolicy prod-gateway-tls -o=jsonpath='{.status.conditions[?(@.type=="Accepted")].message}{"\n"}{.status.conditions[?(@.type=="Enforced")].message}'
 ```
+
+Expected output:
+```
+TLSPolicy has been accepted
+TLSPolicy has been successfully enforced
+```
+
 **Note** This may take a few minutes depending on the TLS provider, for example, Let’s Encrypt.
+
+Updated HTTPRoute for `bookinfo` (contains hostname)
+```bash
+oc apply -f manifests/bookinfo/app/rhcl/productpage-httproute-rhcl.yaml  
+```
+
+Gateway level RatelimitPolicy
+```bash
+oc apply -f rhcl/manifests/policies/gateway/gw-rl-pol.yaml  
+```
+
+Apply DNS Policy
+```bash
+oc -n ingress-gateway apply -f rhcl/manifests/dns/dns-pol.yaml  
+```
+
+Check that your DNSPolicy has status of `Accepted` and `Enforced`
+```bash
+oc -n ingress-gateway get dnspolicy prod-gateway-dnspolicy -o=jsonpath='{.status.conditions[?(@.type=="Accepted")].message}{"\n"}{.status.conditions[?(@.type=="Enforced")].message}'
+```
+
+Expected output
+```
+DNSPolicy has been accepted
+DNSPolicy has been successfully enforced
+```
+
+now you can test the url with the curl command
+```bash
+curl -so - -w "%{http_code}\n" http://bookinfo.demo.leonlevy.lol/api/v1/products/0/ratings 
+```
+
+and
+
+```bash
+curl -k -so - -w "%{http_code}\n" https://bookinfo.demo.leonlevy.lol/api/v1/products/0/ratings 
+```
+
+To test with staging letencrypt root cas
+
+# Download the 'Pretend Pear X1' Staging Root
+curl -sSL https://letsencrypt.org/certs/staging/letsencrypt-stg-root-x1.pem -o staging-root.pem

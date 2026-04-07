@@ -20,7 +20,7 @@ spec:
     - allowedRoutes:
         namespaces:
           from: All
-      hostname: "api.${KUADRANT_ZONE_ROOT_DOMAIN}"
+      hostname: "*.demo.leonlevy.lol"
       name: api
       port: 443
       protocol: HTTPS
@@ -30,3 +30,10 @@ spec:
           kind: Secret
           name: api-prod-gateway-tls
         mode: Terminate
+    - allowedRoutes:
+        namespaces:
+          from: All
+      hostname: "*.demo.leonlevy.lol"
+      name: http
+      port: 80
+      protocol: HTTP

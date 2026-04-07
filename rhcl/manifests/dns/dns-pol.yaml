@@ -1,0 +1,22 @@
+apiVersion: kuadrant.io/v1
+kind: DNSPolicy
+metadata:
+  name: prod-gateway-dnspolicy
+  namespace: ingress-gateway
+spec:
+  # Only needed for single app deployed to two geos
+  # designed for multi-cluster/multi-geo scenarios where you have the same app deployed in multiple locations
+  # healthCheck:
+  #   failureThreshold: 3
+  #   interval: 1m
+  #   path: /health
+  loadBalancing:
+    defaultGeo: true
+    geo: GEO-NA
+    weight: 120
+  targetRef:
+    name: prod-gateway
+    group: gateway.networking.k8s.io
+    kind: Gateway
+  providerRefs:
+  - name: aws-credentials # Secret created earlier
