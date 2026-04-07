@@ -1,55 +1,41 @@
-# Red Hat Connectivity Link – Optional Setup
+# Red Hat Connectivity Link – optional setup
 
----
+## 1. Environment and cluster context
 
-## 1. Get environment settings
+1. Load the environment variables:
 
-If needed for more than one cluster, source the environment variables:
+   ```bash
+  
+   source rhcl/env.sh
+   ```
 
-```bash
-source scripts/00-env.sh
-source rhcl/env.sh 
-```
+2. Switch to the OpenShift context for the cluster you are configuring:
 
-Switch to the context of the current cluster:
-
-```bash
-oc config use-context admin-east
-```
-
----
+   ```bash
+   oc config use-context admin-east
+   ```
 
 ## 2. Install operators
 
-```bash
-oc apply -f rhcl/manifests/operators/
-```
-This will install the Red Hat Connectivity Link Operator, which in turn, also automatically installs the following operators
-```
-NAME                                    DISPLAY                            
-authorino-operator.v1.3.x               Authorino Operator                 
-dns-operator.v1.3.x                     DNS Operator                       
-limitador-operator.v1.3.x               Limitador Operator                 
-rhcl-operator.v1.3.x                    Red Hat Connectivity Link          
-```
+1. Apply the operator manifests:
 
-Once installed, enable the RHCL console plugin via the OpenShift Web Console:
+   ```bash
+   oc apply -f rhcl/manifests/operators/
+   ```
 
-```
-Home -> Overview -> Dynamic Plugins -> View All
-```
+   This installs the Red Hat Connectivity Link Operator, which also pulls in related operators (for example Authorino, DNS, and Limitador). Exact versions depend on your channel and catalog.
 
-Enable `kuadrant-console-plugin`.
+2. After installation, enable the RHCL console plugin using one of the following:
 
-or via command line:
+   **OpenShift web console:** **Home** → **Overview** → **Dynamic Plugins** → **View all** → enable **kuadrant-console-plugin**.
 
-```bash
-oc patch console.operator.openshift.io cluster \
-  --type=json \
-  -p '[{"op":"add","path":"/spec/plugins/-","value":"kuadrant-console-plugin"}]'
-```
+   **CLI:**
 
----
+   ```bash
+   oc patch console.operator.openshift.io cluster \
+     --type=json \
+     -p '[{"op":"add","path":"/spec/plugins/-","value":"kuadrant-console-plugin"}]'
+   ```
 
 ## 3. Create a Kuadrant system
 
@@ -57,13 +43,11 @@ oc patch console.operator.openshift.io cluster \
 oc apply -f rhcl/manifests/kuadrant-system/
 ```
 
----
+## 4. Apply auth policies 
 
-## 4. Apply policies
+These examples assume you use the Kubernetes Gateway created for the **bookinfo** application.
 
 ### 4.1 Gateway-level deny-all policy
-
-If using the Kubernetes Gateway created for the `bookinfo` application, create a `deny-all` policy (if desired):
 
 ```bash
 oc -n ingress-gateway apply -f rhcl/manifests/policies/gateway/gw-auth-pol.yaml
@@ -71,177 +55,193 @@ oc -n ingress-gateway apply -f rhcl/manifests/policies/gateway/gw-auth-pol.yaml
 
 ### 4.2 HTTPRoute-level allow-all policy
 
-Override with an `allow-all` policy at the HTTPRoute level for the `bookinfo` app:
+Override with an allow-all policy on the HTTPRoute for bookinfo:
 
 ```bash
 oc -n bookinfo apply -f rhcl/manifests/policies/httproute/http-route-auth-pol.yaml
 ```
 
-### Gateway DNS/TLS Setup
-Order of operations matters:
-1. Proper DNS setup (Route 53 instructions here)... remember "It's always DNS"
-2. Apply ClusterIssuer 
-3. Apply Gateway 
-4. Apply TLSPolicy → cert-manager sees it, requests the cert from Let's Encrypt, and populates the secret
+## 5. DNS and TLS for the Gateway
 
-Route 53 DNS prereqs:
+Order matters: DNS must resolve correctly before ACME challenges can succeed, then the ClusterIssuer, Gateway, and TLSPolicy must be applied in sequence so **cert-manager** can create the TLS secret the Gateway references.
 
-1. Domain Registration
+### 5.1 Route 53 prerequisites (outside the cluster)
 
-Ensure your root domain (e.g. `leonlevy.lol`) is registered and its nameservers are pointing to Route53. If registered elsewhere, update the nameservers at your registrar to match the `NS` records in your Route53 hosted zone.
+Complete these steps in AWS before the cluster steps in [§5.2](#52-cluster-steps-tls-and-dns-resources).
 
-2. Create a Subdomain Hosted Zone
+1. **Domain registration**  
+   Ensure your root domain (for example `leonlevy.lol`) is registered and its nameservers point at Route 53. If the domain is registered elsewhere, set the registrar nameservers to match the **NS** records in your Route 53 hosted zone.
 
-Create a dedicated public hosted zone for the subdomain you'll use for your demo/environment (e.g. `demo.leonlevy.lol`). This keeps your Kuadrant-managed DNS records isolated from your root domain.
+2. **Subdomain hosted zone**  
+   Create a dedicated *public* hosted zone for the subdomain you will use for the demo (for example `demo.leonlevy.lol`). This isolates Kuadrant-managed records from the root zone.
 
-3. Delegate the Subdomain
+3. **Delegate the subdomain**  
+   In the *parent* hosted zone (`leonlevy.lol`), create an **NS** record that delegates the subdomain to the new zone:
 
-In the parent hosted zone (`leonlevy.lol`), create an NS record that delegates the subdomain to its own hosted zone:
+   - **Record name:** `demo` (or the label that matches your subdomain).
+   - **Type:** `NS`.
+   - **Values:** the four nameservers from the `demo.leonlevy.lol` hosted zone.
+   - **Routing policy:** Simple.
 
-* Record name: `demo`
-* Type: `NS`
-* Values: the 4 nameservers from the `demo.leonlevy.lol` hosted zone
-* Routing policy: `Simple`
+   This step is easy to skip; if it is wrong, TLS certificate issuance can fail without an obvious cluster-side error.
 
-This is the step most likely to be missed and will cause TLS certificate issuance to silently fail.
+4. **Hosted zone ID for cert-manager**  
+   Use the hosted zone ID of the **subdomain** zone (`demo.leonlevy.lol`) as `hostedZoneID` in your ClusterIssuer. Do not use the root zone ID—**cert-manager** would publish ACME **TXT** records in the wrong zone and the challenge would never resolve.
 
-4. Note the Subdomain Hosted Zone ID
+5. **AWS credentials for DNS-01**  
+   Create an IAM user (or another principal) with Route 53 permissions on the subdomain zone, for example:
 
-The hosted zone ID of `demo.leonlevy.lol` is what goes into `hostedZoneID` in your `ClusterIssuer`. Do not use the root domain's zone ID — `cert-manager` will write `TXT` records to the wrong zone and the ACME challenge will never resolve.
+   - `route53:GetChange`
+   - `route53:ChangeResourceRecordSets`
+   - `route53:ListHostedZonesByName`
 
-5. Create AWS Credentials
+   The AWS account root user has broad access by default; prefer a scoped IAM user for clusters.
 
-Create an `IAM` user with the following Route53 permissions on the subdomain hosted zone:
+### 5.2 Cluster steps (TLS and DNS resources)
 
-* `route53:GetChange`
-* `route53:ChangeResourceRecordSets`
-* `route53:ListHostedZonesByName`
+Once the Route 53 work in [§5.1](#51-route-53-prerequisites-outside-the-cluster) is done, run these steps in order.
 
-root user has these by default
+1. **Secret for Kuadrant DNS integration (`ingress-gateway` namespace)**
 
-One the above is complete, you may proceed with the following cluster steps
+   ```bash
+   oc -n ingress-gateway create secret generic aws-credentials \
+     --type=kuadrant.io/aws \
+     --from-literal=AWS_ACCESS_KEY_ID=$KUADRANT_AWS_ACCESS_KEY_ID \
+     --from-literal=AWS_SECRET_ACCESS_KEY=$KUADRANT_AWS_SECRET_ACCESS_KEY
+   ```
 
-## Cluster steps
+2. **Secret for cert-manager (same credentials, `cert-manager` namespace)**
 
-Create the secret `aws-credentials` in the same namespace as the Gateway
+   ```bash
+   oc -n cert-manager create secret generic aws-credentials \
+     --type=kuadrant.io/aws \
+     --from-literal=AWS_ACCESS_KEY_ID=$KUADRANT_AWS_ACCESS_KEY_ID \
+     --from-literal=AWS_SECRET_ACCESS_KEY=$KUADRANT_AWS_SECRET_ACCESS_KEY
+   ```
 
-```bash
-oc -n ingress-gateway create secret generic aws-credentials \
-  --type=kuadrant.io/aws \
-  --from-literal=AWS_ACCESS_KEY_ID=$KUADRANT_AWS_ACCESS_KEY_ID \
-  --from-literal=AWS_SECRET_ACCESS_KEY=$KUADRANT_AWS_SECRET_ACCESS_KEY
-```
+3. **ClusterIssuer (cluster-scoped)**  
+   **Note:** The manifest uses `envsubst` because `KUADRANT_AWS_DNS_PUBLIC_ZONE_ID` is environment-specific. You can replace this with a ConfigMap-driven workflow if you prefer.
 
-Before adding a TLS certificate issuer, create the secret `aws-credentials` in the `cert-manager` namespace
+   ```bash
+   envsubst < rhcl/manifests/tls-setup/cluster-issuer.yaml | oc apply -f -
+   ```
 
-```bash
-oc -n cert-manager create secret generic aws-credentials \
-  --type=kuadrant.io/aws \
-  --from-literal=AWS_ACCESS_KEY_ID=$KUADRANT_AWS_ACCESS_KEY_ID \
-  --from-literal=AWS_SECRET_ACCESS_KEY=$KUADRANT_AWS_SECRET_ACCESS_KEY
-```
+4. **Wait until the ClusterIssuer is ready**
 
-To secure communication to your Gateways, you must define a certification authority as an issuer for TLS certificates.
+   ```bash
+   oc wait clusterissuer/letsencrypt --for=condition=ready=true
+   ```
 
-define a TLS certificate issuer (cluster scoped)
-```bash
-envsubst < rhcl/manifests/tls-setup/cluster-issuer.yaml | oc apply -f -
-```
-**Note** `envsubst` is used, since `KUADRANT_AWS_DNS_PUBLIC_ZONE_ID` is unique to your environment. May switch to configmap for this.
+5. **Gateway**  
+   Edit `manifests/ingress-gateway/rhcl/gateway.yaml` with your, then apply:
 
-Wait for the ClusterIssuer to become ready
+   ```bash
+   oc apply -f manifests/ingress-gateway/rhcl/gateway.yaml
+   ```
 
-```bash
-oc wait clusterissuer/letsencrypt --for=condition=ready=true
-```
+   **Note:** The TLS secret `api-prod-gateway-tls` referenced by the Gateway does not exist yet. **cert-manager** creates it after you apply a **TLSPolicy** that targets this Gateway—keep this order.
 
-Create the RHCL enabled gateway (**Note** update with your domain)
+6. **Check Gateway acceptance and programming**
 
-```bash
-oc apply -f manifests/ingress-gateway/rhcl/gateway.yaml
-```
-**Note** The secret (`api-prod-gateway-tls`)contained in the above CR doesn't exist yet. It will be created automatically by `cert-manager` when you apply a `TLSPolicy` that targets this `Gateway` — so the order of operations matters.
+   ```bash
+   oc -n ingress-gateway get gateway prod-gateway -o=jsonpath='{.status.conditions[?(@.type=="Accepted")].message}{"\n"}{.status.conditions[?(@.type=="Programmed")].message}'
+   ```
 
-Check the status of the Gateway:
-```bash
-oc -n ingress-gateway get gateway prod-gateway -o=jsonpath='{.status.conditions[?(@.type=="Accepted")].message}{"\n"}{.status.conditions[?(@.type=="Programmed")].message}'
-```
+   Example output:
 
-expected output:
-```
-Resource accepted
-Resource programmed, assigned to service(s) prod-gateway-istio.ingress-gateway.svc.cluster.local:443 and prod-gateway-istio.ingress-gateway.svc.cluster.local:80
-```
+   ```text
+   Resource accepted
+   Resource programmed, assigned to service(s) prod-gateway-istio.ingress-gateway.svc.cluster.local:443 and prod-gateway-istio.ingress-gateway.svc.cluster.local:80
+   ```
 
-at this point 
-```bash
-oc get gateway ${KUADRANT_GATEWAY_NAME} -n ${KUADRANT_GATEWAY_NS} -o=jsonpath='{.status.listeners[0].conditions[?(@.type=="Programmed")].message}'
-```
+7. **Expected “Bad TLS configuration” on the HTTPS listener**  
+   Until the secret exists, a listener status check may show **Bad TLS configuration**. That is expected:
 
-will return `Bad TLS configuration`. This is expected, since the Gateway is referenceing a secret 
-(`api-prod-gateway-tls`) that doesn's exist yet
+   ```bash
+   oc get gateway "${KUADRANT_GATEWAY_NAME}" -n "${KUADRANT_GATEWAY_NS}" -o=jsonpath='{.status.listeners[0].conditions[?(@.type=="Programmed")].message}'
+   ```
 
-`cert-manager` hasn't created it because you haven't applied a `TLSPolicy` yet.
-Istio sees the TLS config pointing to a missing secret and reports `Bad TLS configuration` as a result. Once you apply the `TLSPolicy` and `cert-manager` successfully issues the certificate and populates the secret, that status will update to `Programmed` and the message will clear.
+   The Gateway references `api-prod-gateway-tls` before **cert-manager** has created it. **cert-manager** only acts after you apply the **TLSPolicy**. Istio therefore reports bad TLS until the secret is populated. After issuance succeeds, the status should move to **Programmed** and the message should clear.
 
-Create the `TLSPolicy` for the Gateway
+8. **TLSPolicy**
 
-```bash
-oc -n ingress-gateway apply -f rhcl/manifests/tls-setup/tls-policy.yaml 
-```
+   ```bash
+   oc -n ingress-gateway apply -f rhcl/manifests/tls-setup/tls-policy.yaml
+   ```
 
-Check that your TLS policy has an Accepted and Enforced status
+9. **Verify TLSPolicy status**  
+   Propagation can take several minutes depending on the CA (for example Let’s Encrypt).
 
-```bash
-oc -n ingress-gateway get tlspolicy prod-gateway-tls -o=jsonpath='{.status.conditions[?(@.type=="Accepted")].message}{"\n"}{.status.conditions[?(@.type=="Enforced")].message}'
-```
+   ```bash
+   oc -n ingress-gateway get tlspolicy prod-gateway-tls -o=jsonpath='{.status.conditions[?(@.type=="Accepted")].message}{"\n"}{.status.conditions[?(@.type=="Enforced")].message}'
+   ```
 
-Expected output:
-```
-TLSPolicy has been accepted
-TLSPolicy has been successfully enforced
-```
+   Example output:
 
-**Note** This may take a few minutes depending on the TLS provider, for example, Let’s Encrypt.
+   ```text
+   TLSPolicy has been accepted
+   TLSPolicy has been successfully enforced
+   ```
 
-Updated HTTPRoute for `bookinfo` (contains hostname)
-```bash
-oc apply -f manifests/bookinfo/app/rhcl/productpage-httproute-rhcl.yaml  
-```
+10. **HTTPRoute for bookinfo (update hostname)**
 
-Gateway level RatelimitPolicy
-```bash
-oc apply -f rhcl/manifests/policies/gateway/gw-rl-pol.yaml  
-```
+    ```bash
+    oc apply -f manifests/bookinfo/app/rhcl/productpage-httproute-rhcl.yaml
+    ```
 
-Apply DNS Policy
-```bash
-oc -n ingress-gateway apply -f rhcl/manifests/dns/dns-pol.yaml  
-```
+11. **Gateway-level RateLimitPolicy**
 
-Check that your DNSPolicy has status of `Accepted` and `Enforced`
-```bash
-oc -n ingress-gateway get dnspolicy prod-gateway-dnspolicy -o=jsonpath='{.status.conditions[?(@.type=="Accepted")].message}{"\n"}{.status.conditions[?(@.type=="Enforced")].message}'
-```
+    ```bash
+    oc apply -f rhcl/manifests/policies/gateway/gw-rl-pol.yaml
+    ```
 
-Expected output
-```
-DNSPolicy has been accepted
-DNSPolicy has been successfully enforced
-```
+12. **DNSPolicy**
 
-now you can test the url with the curl command
-```bash
-curl -so - -w "%{http_code}\n" http://bookinfo.demo.leonlevy.lol/api/v1/products/0/ratings 
-```
+    ```bash
+    oc -n ingress-gateway apply -f rhcl/manifests/dns/dns-pol.yaml
+    ```
 
-and
+13. **Verify DNSPolicy status**
 
-```bash
-curl -k -so - -w "%{http_code}\n" https://bookinfo.demo.leonlevy.lol/api/v1/products/0/ratings 
-```
+    ```bash
+    oc -n ingress-gateway get dnspolicy prod-gateway-dnspolicy -o=jsonpath='{.status.conditions[?(@.type=="Accepted")].message}{"\n"}{.status.conditions[?(@.type=="Enforced")].message}'
+    ```
 
-To test with staging letencrypt root cas
+    Example output:
 
-# Download the 'Pretend Pear X1' Staging Root
-curl -sSL https://letsencrypt.org/certs/staging/letsencrypt-stg-root-x1.pem -o staging-root.pem
+    ```text
+    DNSPolicy has been accepted
+    DNSPolicy has been successfully enforced
+    ```
+
+## 6. Smoke tests
+
+Use your real hostname instead of `bookinfo.demo.leonlevy.lol` if it differs.
+
+1. **HTTP**
+
+   ```bash
+   curl -so - -w "%{http_code}\n" http://bookinfo.demo.leonlevy.lol/api/v1/products/0/ratings
+   ```
+
+2. **HTTPS (skip verify)**
+
+   ```bash
+   curl -k -so - -w "%{http_code}\n" https://bookinfo.demo.leonlevy.lol/api/v1/products/0/ratings
+   ```
+
+### 6.1 HTTPS with Let’s Encrypt staging CA
+
+If you issue certificates against Let’s Encrypt **staging**, verify with the staging root instead of `-k`.
+
+1. Download the staging root (for example **(Staging) Pretend Pear X1**):
+
+   ```bash
+   curl -sSL https://letsencrypt.org/certs/staging/letsencrypt-stg-root-x1.pem -o staging-root.pem
+   ```
+
+2. **curl** with `--cacert`:
+
+   ```bash
+   curl -v --cacert staging-root.pem https://bookinfo.demo.leonlevy.lol/api/v1/products/0/ratings
+   ```
