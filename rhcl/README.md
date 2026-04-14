@@ -9,6 +9,11 @@
    source rhcl/env.sh
    ```
 
+   Hosted zone ID can be obtained with AWS CLI
+   ```bash
+   aws route53 list-hosted-zones-by-name --dns-name "yourdomain.com" --query "HostedZones[0].Id" --output text
+   ```
+
 2. Switch to the OpenShift context for the cluster you are configuring:
 
    ```bash
@@ -36,11 +41,24 @@
      --type=json \
      -p '[{"op":"add","path":"/spec/plugins/-","value":"kuadrant-console-plugin"}]'
    ```
+## Minimal istio control plane
+
+If you are running RHCL without the full blown istio control plane with side-cars, you still need a minimal istio-system
+
+```bash
+oc apply -f rhcl/manifests/ossm-minimal
+```
 
 ## 3. Create a Kuadrant system
 
 ```bash
 oc apply -f rhcl/manifests/kuadrant-system/
+```
+
+## Create/Update Ingress Gateway
+
+```bash
+oc apply -f manifests/ingress-gateway/rhcl/gateway.yaml 
 ```
 
 ## 4. Apply auth policies 
@@ -53,7 +71,7 @@ These examples assume you use the Kubernetes Gateway created for the **bookinfo*
 oc -n ingress-gateway apply -f rhcl/manifests/policies/gateway/gw-auth-pol.yaml
 ```
 
-### 4.2 HTTPRoute-level allow-all policy
+### 4.2 HTTPRoute-level allow-all policy (skip)
 
 Override with an allow-all policy on the HTTPRoute for bookinfo:
 
@@ -133,7 +151,7 @@ Once the Route 53 work in [§5.1](#51-route-53-prerequisites-outside-the-cluste
    ```
 
 5. **Gateway**  
-   Edit `manifests/ingress-gateway/rhcl/gateway.yaml` with your, then apply:
+   Edit `manifests/ingress-gateway/rhcl/gateway.yaml` with your domain, then apply:
 
    ```bash
    oc apply -f manifests/ingress-gateway/rhcl/gateway.yaml
@@ -245,3 +263,117 @@ If you issue certificates against Let’s Encrypt **staging**, verify with the s
    ```bash
    curl -v --cacert staging-root.pem https://bookinfo.demo.leonlevy.lol/api/v1/products/0/ratings
    ```
+
+**HTTPRoute-level RateLimitPolicy/AuthPolicy (API KEY)**
+
+set up API Keys with kuadrant system
+
+```bash
+oc -n kuadrant-system apply -f manifests/bookinfo/app/rhcl/productpage-keys.yaml 
+```
+  
+Output:
+```
+secret/bob-key created
+secret/alice-key created
+```
+
+
+bookinfo API Key based AuthPolicy
+```bash
+oc -n bookinfo delete authpolicies.kuadrant.io allow-all 
+oc -n bookinfo apply -f rhcl/manifests/policies/httproute/http-route-auth-pol-user.yaml 
+```
+
+bookinfo API Key based RateLimitPolicy
+
+```bash
+oc apply -f rhcl/manifests/policies/httproute/http-route-rl-pol.yaml 
+```
+
+The following returns a 401 (unauthorized), return code
+```bash
+curl -k -so - -w "%{http_code}\n" https://bookinfo.demo.leonlevy.lol/api/v1/products/0/ratings
+```
+
+Test with headers (API Key)
+
+```bash
+curl -k -so - -w "%{http_code}\n" https://bookinfo.demo.leonlevy.lol/api/v1/products/0/ratings -H 'Authorization: APIKEY IAMALICE' 
+```
+
+`{"id": 0, "ratings": {"Reviewer1": 5, "Reviewer2": 4}, "Cluster": "CLUSTER-EAST"}200`
+
+
+```bash
+curl -k -so - -w "%{http_code}\n" https://bookinfo.demo.leonlevy.lol/api/v1/products/0/ratings -H 'Authorization: APIKEY IAMBOB'  
+```
+
+`{"id": 0, "ratings": {"Reviewer1": 5, "Reviewer2": 4}, "Cluster": "CLUSTER-EAST"}200`
+
+Bad key
+```bash
+ curl -k -so - -w "%{http_code}\n" https://bookinfo.demo.leonlevy.lol/api/v1/products/0/ratings -H 'Authorization: APIKEY IAMLEON' 
+```
+
+```json
+{
+  "error": "Forbidden",
+  "message": "Access denied by default by the application owner. If you are the administrator of the service, create a specific auth policy for the route."
+}
+401
+```
+
+Test RL policy (bob has higher rate limit than alice)
+
+Alice - 5 req/10s (GW level policy)
+```bash
+for i in {1..10}
+do
+curl -k -so - https://bookinfo.demo.leonlevy.lol/api/v1/products/$i/ratings -H 'Authorization: APIKEY IAMALICE' && echo  
+sleep 1
+done
+```
+
+Output
+
+```json
+{"id": 1, "ratings": {"Reviewer1": 5, "Reviewer2": 4}, "Cluster": "CLUSTER-EAST"}
+{"id": 2, "ratings": {"Reviewer1": 5, "Reviewer2": 4}, "Cluster": "CLUSTER-EAST"}
+{"id": 3, "ratings": {"Reviewer1": 5, "Reviewer2": 4}, "Cluster": "CLUSTER-EAST"}
+{"id": 4, "ratings": {"Reviewer1": 5, "Reviewer2": 4}, "Cluster": "CLUSTER-EAST"}
+{"id": 5, "ratings": {"Reviewer1": 5, "Reviewer2": 4}, "Cluster": "CLUSTER-EAST"}
+
+Too Many Requests
+
+Too Many Requests
+
+Too Many Requests
+
+{"id": 9, "ratings": {"Reviewer1": 5, "Reviewer2": 4}, "Cluster": "CLUSTER-EAST"}
+{"id": 10, "ratings": {"Reviewer1": 5, "Reviewer2": 4}, "Cluster": "CLUSTER-EAST"}
+```
+
+Bob - 20 req/10s (HTTPRoute level RL pol)
+
+```bash
+for i in {1..10}
+do
+curl -k -so - https://bookinfo.demo.leonlevy.lol/api/v1/products/$i/ratings -H 'Authorization: APIKEY IAMBOB' && echo
+sleep 1
+done
+```
+
+Output
+```json
+{"id": 1, "ratings": {"Reviewer1": 5, "Reviewer2": 4}, "Cluster": "CLUSTER-EAST"}
+{"id": 2, "ratings": {"Reviewer1": 5, "Reviewer2": 4}, "Cluster": "CLUSTER-EAST"}
+{"id": 3, "ratings": {"Reviewer1": 5, "Reviewer2": 4}, "Cluster": "CLUSTER-EAST"}
+{"id": 4, "ratings": {"Reviewer1": 5, "Reviewer2": 4}, "Cluster": "CLUSTER-EAST"}
+{"id": 5, "ratings": {"Reviewer1": 5, "Reviewer2": 4}, "Cluster": "CLUSTER-EAST"}
+{"id": 6, "ratings": {"Reviewer1": 5, "Reviewer2": 4}, "Cluster": "CLUSTER-EAST"}
+{"id": 7, "ratings": {"Reviewer1": 5, "Reviewer2": 4}, "Cluster": "CLUSTER-EAST"}
+{"id": 8, "ratings": {"Reviewer1": 5, "Reviewer2": 4}, "Cluster": "CLUSTER-EAST"}
+{"id": 9, "ratings": {"Reviewer1": 5, "Reviewer2": 4}, "Cluster": "CLUSTER-EAST"}
+{"id": 10, "ratings": {"Reviewer1": 5, "Reviewer2": 4}, "Cluster": "CLUSTER-EAST"}
+```

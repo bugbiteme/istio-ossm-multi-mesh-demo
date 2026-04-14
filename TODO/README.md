@@ -8,8 +8,11 @@ RHCL
 - AuthPolicy (bookinfo)
 - Incorporate travel-agency web portal like in workshop
 - Multi-cloud failover
-- LLM
+- LLM - TokenRateLimitPolicy
+  - hosted LLM
+  - External LLM
 - MCP gateway
+- VM based workloads (OVE)
 
 **HTTPRoute-level RateLimitPolicy**
 
@@ -94,7 +97,7 @@ Bob - 20 req/10s
 ```bash
 for i in {1..10}
 do
-curl -k -so - https://bookinfo.demo.leonlevy.lol/api/v1/products/${i}/ratings -H 'Authorization: APIKEY IAMBOB' && echo
+curl -k -so - https://bookinfo.demo.leonlevy.lol/api/v1/products/$i/ratings -H 'Authorization: APIKEY IAMBOB' && echo
 sleep 1
 done
 ```

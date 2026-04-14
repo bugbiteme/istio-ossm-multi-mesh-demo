@@ -1,43 +1,21 @@
 apiVersion: kuadrant.io/v1
-kind: AuthPolicy
+kind: RateLimitPolicy
 metadata:
-  name: bookinfo-auth
+  name: bookinfo-rl
   namespace: bookinfo
 spec:
   targetRef:
     group: gateway.networking.k8s.io
     kind: HTTPRoute
     name: bookinfo
+    sectionName: rule-1
   defaults:
-    when:
-      - predicate: "request.path != '/health'"
-    rules:
-      authentication:
-        "api-key-users":
-          apiKey:
-            selector:
-              matchLabels:
-                app: bookinfo
-          credentials:
-            authorizationHeader:
-              prefix: APIKEY
-      # This block MUST be at this level to catch the "UNAUTHENTICATED" state
-      # triggered by the "api-key-users" failure above.
-      response:
-        unauthenticated:
-          body:
-            value: |
-              {
-                "error": "Forbidden",
-                "message": "Access denied by default by the application owner. If you are the administrator of the service, create a specific auth policy for the route."
-              }
-          headers:
-            content-type:
-              value: application/json
-        success:
-          filters:
-            "identity":
-              json:
-                properties:
-                  "userid":
-                    selector: auth.identity.metadata.annotations.secret\.kuadrant\.io/user-id
+    strategy: merge
+    limits:
+      "bob-limit":
+        rates:
+
+        - limit: 20
+          window: 10s
+        when:
+        - predicate: "auth.identity.userid == 'bob'"
