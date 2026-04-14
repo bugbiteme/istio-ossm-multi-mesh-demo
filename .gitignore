@@ -14,4 +14,4 @@ ansible/multi_cluster/env.sh
 
 *.pem
 
-rhcl/env.sh
+env.sh

@@ -12,5 +12,5 @@ spec:
     limits:
       "low-limit":
         rates:
-        - limit: 5
+        - limit: 2
           window: 10s

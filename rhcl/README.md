@@ -5,11 +5,11 @@
 1. Load the environment variables:
 
    ```bash
-  
    source rhcl/env.sh
    ```
 
-   Hosted zone ID can be obtained with AWS CLI
+   Hosted zone ID can be obtained with AWS CLI:
+
    ```bash
    aws route53 list-hosted-zones-by-name --dns-name "yourdomain.com" --query "HostedZones[0].Id" --output text
    ```
@@ -28,7 +28,7 @@
    oc apply -f rhcl/manifests/operators/
    ```
 
-   This installs the Red Hat Connectivity Link Operator, which also pulls in related operators (for example Authorino, DNS, and Limitador). Exact versions depend on your channel and catalog.
+   This installs the Red Hat Connectivity Link Operator, which also pulls in related operators (for example Authorino, DNS, and Limitador). Exact versions depend on your channel and catalog. Wait for all operators to install before proceeding.
 
 2. After installation, enable the RHCL console plugin using one of the following:
 
@@ -41,43 +41,23 @@
      --type=json \
      -p '[{"op":"add","path":"/spec/plugins/-","value":"kuadrant-console-plugin"}]'
    ```
-## Minimal istio control plane
+The OpenShift web console will refresh and you will see "Connectivity Link" as one of the left menu options
 
-If you are running RHCL without the full blown istio control plane with side-cars, you still need a minimal istio-system
+## 3. Minimal Istio control plane
+
+If you are running RHCL without the full Istio control plane with sidecars, you still need a minimal `istio-system`:
 
 ```bash
 oc apply -f rhcl/manifests/ossm-minimal
 ```
 
-## 3. Create a Kuadrant system
+## 4. Create a Kuadrant system
 
 ```bash
 oc apply -f rhcl/manifests/kuadrant-system/
 ```
 
-## Create/Update Ingress Gateway
-
-```bash
-oc apply -f manifests/ingress-gateway/rhcl/gateway.yaml 
-```
-
-## 4. Apply auth policies 
-
-These examples assume you use the Kubernetes Gateway created for the **bookinfo** application.
-
-### 4.1 Gateway-level deny-all policy
-
-```bash
-oc -n ingress-gateway apply -f rhcl/manifests/policies/gateway/gw-auth-pol.yaml
-```
-
-### 4.2 HTTPRoute-level allow-all policy (skip)
-
-Override with an allow-all policy on the HTTPRoute for bookinfo:
-
-```bash
-oc -n bookinfo apply -f rhcl/manifests/policies/httproute/http-route-auth-pol.yaml
-```
+Wait for pods in `kuadrant-system` to finish deployment
 
 ## 5. DNS and TLS for the Gateway
 
@@ -85,10 +65,10 @@ Order matters: DNS must resolve correctly before ACME challenges can succeed, th
 
 ### 5.1 Route 53 prerequisites (outside the cluster)
 
-Complete these steps in AWS before the cluster steps in [§5.2](#52-cluster-steps-tls-and-dns-resources).
+Complete these steps in AWS before the cluster steps in [section 5.2](#52-cluster-steps-tls-and-dns-resources).
 
 1. **Domain registration**  
-   Ensure your root domain (for example `leonlevy.lol`) is registered and its nameservers point at Route 53. If the domain is registered elsewhere, set the registrar nameservers to match the **NS** records in your Route 53 hosted zone.
+   Ensure your root domain (for example `leonlevy.lol`) is registered and its nameservers point at Route 53. If the domain is registered elsewhere, set the registrar nameservers to match the **NS** records in your Route 53 hosted zone.
 
 2. **Subdomain hosted zone**  
    Create a dedicated *public* hosted zone for the subdomain you will use for the demo (for example `demo.leonlevy.lol`). This isolates Kuadrant-managed records from the root zone.
@@ -107,7 +87,7 @@ Complete these steps in AWS before the cluster steps in [§5.2](#52-cluster-step
    Use the hosted zone ID of the **subdomain** zone (`demo.leonlevy.lol`) as `hostedZoneID` in your ClusterIssuer. Do not use the root zone ID—**cert-manager** would publish ACME **TXT** records in the wrong zone and the challenge would never resolve.
 
 5. **AWS credentials for DNS-01**  
-   Create an IAM user (or another principal) with Route 53 permissions on the subdomain zone, for example:
+   Create an IAM user (or another principal) with Route 53 permissions on the subdomain zone, for example:
 
    - `route53:GetChange`
    - `route53:ChangeResourceRecordSets`
@@ -117,7 +97,7 @@ Complete these steps in AWS before the cluster steps in [§5.2](#52-cluster-step
 
 ### 5.2 Cluster steps (TLS and DNS resources)
 
-Once the Route 53 work in [§5.1](#51-route-53-prerequisites-outside-the-cluster) is done, run these steps in order.
+Once the Route 53 work in [section 5.1](#51-route-53-prerequisites-outside-the-cluster) is done, run these steps in order.
 
 1. **Secret for Kuadrant DNS integration (`ingress-gateway` namespace)**
 
@@ -188,7 +168,7 @@ Once the Route 53 work in [§5.1](#51-route-53-prerequisites-outside-the-cluste
    ```
 
 9. **Verify TLSPolicy status**  
-   Propagation can take several minutes depending on the CA (for example Let’s Encrypt).
+   Propagation can take several minutes (< 2) depending on the CA (for example Let’s Encrypt).
 
    ```bash
    oc -n ingress-gateway get tlspolicy prod-gateway-tls -o=jsonpath='{.status.conditions[?(@.type=="Accepted")].message}{"\n"}{.status.conditions[?(@.type=="Enforced")].message}'
@@ -201,25 +181,13 @@ Once the Route 53 work in [§5.1](#51-route-53-prerequisites-outside-the-cluste
    TLSPolicy has been successfully enforced
    ```
 
-10. **HTTPRoute for bookinfo (update hostname)**
-
-    ```bash
-    oc apply -f manifests/bookinfo/app/rhcl/productpage-httproute-rhcl.yaml
-    ```
-
-11. **Gateway-level RateLimitPolicy**
-
-    ```bash
-    oc apply -f rhcl/manifests/policies/gateway/gw-rl-pol.yaml
-    ```
-
-12. **DNSPolicy**
+10. **DNSPolicy**
 
     ```bash
     oc -n ingress-gateway apply -f rhcl/manifests/dns/dns-pol.yaml
     ```
 
-13. **Verify DNSPolicy status**
+11. **Verify DNSPolicy status**
 
     ```bash
     oc -n ingress-gateway get dnspolicy prod-gateway-dnspolicy -o=jsonpath='{.status.conditions[?(@.type=="Accepted")].message}{"\n"}{.status.conditions[?(@.type=="Enforced")].message}'
@@ -231,8 +199,154 @@ Once the Route 53 work in [§5.1](#51-route-53-prerequisites-outside-the-cluste
     DNSPolicy has been accepted
     DNSPolicy has been successfully enforced
     ```
+12. **Gateway-level RateLimitPolicy**
 
-## 6. Smoke tests
+    ```bash
+    oc apply -f rhcl/manifests/policies/gateway/gw-rl-pol.yaml
+    ```
+
+13. **HTTPRoute for bookinfo (update hostname)**
+
+    ```bash
+    oc apply -f manifests/bookinfo/app/rhcl/productpage-httproute-rhcl.yaml
+    ```
+## 6. Apply auth policies
+
+These examples assume you use the Kubernetes Gateway created for the **bookinfo** application. Complete [section 5](#5-dns-and-tls-for-the-gateway) first so the Gateway, TLS, and routes exist.
+
+### 6.1 Gateway-level deny-all policy
+
+```bash
+oc -n ingress-gateway apply -f rhcl/manifests/policies/gateway/gw-auth-pol.yaml
+```
+
+### 6.2 API keys (Kuadrant system)
+
+Create secrets used by the HTTPRoute policies:
+
+```bash
+oc -n kuadrant-system apply -f manifests/bookinfo/app/rhcl/productpage-keys.yaml
+```
+
+Example output:
+
+```text
+secret/bob-key created
+secret/alice-key created
+```
+
+### 6.3 HTTPRoute AuthPolicy and RateLimitPolicy
+
+Apply the user-facing AuthPolicy and the HTTPRoute-level rate limit:
+
+```bash
+oc -n bookinfo apply -f rhcl/manifests/policies/httproute/http-route-auth-pol-user.yaml
+```
+
+```bash
+oc apply -f rhcl/manifests/policies/httproute/http-route-rl-pol.yaml
+```
+
+### 6.4 Verify with curl
+
+Use your real hostname instead of `bookinfo.demo.leonlevy.lol` if it differs.
+
+**No API key (expect 401):**
+
+```bash
+curl -k -so - -w "%{http_code}\n" https://bookinfo.demo.leonlevy.lol/api/v1/products/0/ratings
+```
+
+**Valid API keys (expect 200):**
+
+```bash
+curl -k -so - -w "%{http_code}\n" https://bookinfo.demo.leonlevy.lol/api/v1/products/0/ratings -H 'Authorization: APIKEY IAMALICE'
+```
+
+```bash
+curl -k -so - -w "%{http_code}\n" https://bookinfo.demo.leonlevy.lol/api/v1/products/0/ratings -H 'Authorization: APIKEY IAMBOB'
+```
+
+Example JSON body (before the status line printed by `-w`):
+
+```json
+{"id": 0, "ratings": {"Reviewer1": 5, "Reviewer2": 4}, "Cluster": "CLUSTER-EAST"}
+```
+
+**Invalid API key (expect 401):**
+
+```bash
+curl -k -so - -w "%{http_code}\n" https://bookinfo.demo.leonlevy.lol/api/v1/products/0/ratings -H 'Authorization: APIKEY IAMLEON'
+```
+
+Example error body:
+
+```json
+{
+  "error": "Forbidden",
+  "message": "Access denied by default by the application owner. If you are the administrator of the service, create a specific auth policy for the route."
+}
+```
+
+### 6.5 Rate limit behavior (optional)
+
+Gateway-level policy vs HTTPRoute-level policy differ by identity (for example Alice vs Bob).
+
+**Alice (example: 5 requests per 10s at gateway level):**
+
+```bash
+for i in {1..10}
+do
+  curl -k -so - https://bookinfo.demo.leonlevy.lol/api/v1/products/$i/ratings -H 'Authorization: APIKEY IAMALICE' && echo
+  sleep 1
+done
+```
+
+Example output (some requests throttled):
+
+```json
+{"id": 1, "ratings": {"Reviewer1": 5, "Reviewer2": 4}, "Cluster": "CLUSTER-EAST"}
+{"id": 2, "ratings": {"Reviewer1": 5, "Reviewer2": 4}, "Cluster": "CLUSTER-EAST"}
+{"id": 3, "ratings": {"Reviewer1": 5, "Reviewer2": 4}, "Cluster": "CLUSTER-EAST"}
+{"id": 4, "ratings": {"Reviewer1": 5, "Reviewer2": 4}, "Cluster": "CLUSTER-EAST"}
+{"id": 5, "ratings": {"Reviewer1": 5, "Reviewer2": 4}, "Cluster": "CLUSTER-EAST"}
+
+Too Many Requests
+
+Too Many Requests
+
+Too Many Requests
+
+{"id": 9, "ratings": {"Reviewer1": 5, "Reviewer2": 4}, "Cluster": "CLUSTER-EAST"}
+{"id": 10, "ratings": {"Reviewer1": 5, "Reviewer2": 4}, "Cluster": "CLUSTER-EAST"}
+```
+
+**Bob (example: higher limit on HTTPRoute policy):**
+
+```bash
+for i in {1..10}
+do
+  curl -k -so - https://bookinfo.demo.leonlevy.lol/api/v1/products/$i/ratings -H 'Authorization: APIKEY IAMBOB' && echo
+  sleep 1
+done
+```
+
+Example output:
+
+```json
+{"id": 1, "ratings": {"Reviewer1": 5, "Reviewer2": 4}, "Cluster": "CLUSTER-EAST"}
+{"id": 2, "ratings": {"Reviewer1": 5, "Reviewer2": 4}, "Cluster": "CLUSTER-EAST"}
+{"id": 3, "ratings": {"Reviewer1": 5, "Reviewer2": 4}, "Cluster": "CLUSTER-EAST"}
+{"id": 4, "ratings": {"Reviewer1": 5, "Reviewer2": 4}, "Cluster": "CLUSTER-EAST"}
+{"id": 5, "ratings": {"Reviewer1": 5, "Reviewer2": 4}, "Cluster": "CLUSTER-EAST"}
+{"id": 6, "ratings": {"Reviewer1": 5, "Reviewer2": 4}, "Cluster": "CLUSTER-EAST"}
+{"id": 7, "ratings": {"Reviewer1": 5, "Reviewer2": 4}, "Cluster": "CLUSTER-EAST"}
+{"id": 8, "ratings": {"Reviewer1": 5, "Reviewer2": 4}, "Cluster": "CLUSTER-EAST"}
+{"id": 9, "ratings": {"Reviewer1": 5, "Reviewer2": 4}, "Cluster": "CLUSTER-EAST"}
+{"id": 10, "ratings": {"Reviewer1": 5, "Reviewer2": 4}, "Cluster": "CLUSTER-EAST"}
+```
+
+## 7. Smoke tests
 
 Use your real hostname instead of `bookinfo.demo.leonlevy.lol` if it differs.
 
@@ -248,7 +362,7 @@ Use your real hostname instead of `bookinfo.demo.leonlevy.lol` if it differs.
    curl -k -so - -w "%{http_code}\n" https://bookinfo.demo.leonlevy.lol/api/v1/products/0/ratings
    ```
 
-### 6.1 HTTPS with Let’s Encrypt staging CA
+### 7.1 HTTPS with Let’s Encrypt staging CA
 
 If you issue certificates against Let’s Encrypt **staging**, verify with the staging root instead of `-k`.
 
@@ -263,117 +377,3 @@ If you issue certificates against Let’s Encrypt **staging**, verify with the s
    ```bash
    curl -v --cacert staging-root.pem https://bookinfo.demo.leonlevy.lol/api/v1/products/0/ratings
    ```
-
-**HTTPRoute-level RateLimitPolicy/AuthPolicy (API KEY)**
-
-set up API Keys with kuadrant system
-
-```bash
-oc -n kuadrant-system apply -f manifests/bookinfo/app/rhcl/productpage-keys.yaml 
-```
-  
-Output:
-```
-secret/bob-key created
-secret/alice-key created
-```
-
-
-bookinfo API Key based AuthPolicy
-```bash
-oc -n bookinfo delete authpolicies.kuadrant.io allow-all 
-oc -n bookinfo apply -f rhcl/manifests/policies/httproute/http-route-auth-pol-user.yaml 
-```
-
-bookinfo API Key based RateLimitPolicy
-
-```bash
-oc apply -f rhcl/manifests/policies/httproute/http-route-rl-pol.yaml 
-```
-
-The following returns a 401 (unauthorized), return code
-```bash
-curl -k -so - -w "%{http_code}\n" https://bookinfo.demo.leonlevy.lol/api/v1/products/0/ratings
-```
-
-Test with headers (API Key)
-
-```bash
-curl -k -so - -w "%{http_code}\n" https://bookinfo.demo.leonlevy.lol/api/v1/products/0/ratings -H 'Authorization: APIKEY IAMALICE' 
-```
-
-`{"id": 0, "ratings": {"Reviewer1": 5, "Reviewer2": 4}, "Cluster": "CLUSTER-EAST"}200`
-
-
-```bash
-curl -k -so - -w "%{http_code}\n" https://bookinfo.demo.leonlevy.lol/api/v1/products/0/ratings -H 'Authorization: APIKEY IAMBOB'  
-```
-
-`{"id": 0, "ratings": {"Reviewer1": 5, "Reviewer2": 4}, "Cluster": "CLUSTER-EAST"}200`
-
-Bad key
-```bash
- curl -k -so - -w "%{http_code}\n" https://bookinfo.demo.leonlevy.lol/api/v1/products/0/ratings -H 'Authorization: APIKEY IAMLEON' 
-```
-
-```json
-{
-  "error": "Forbidden",
-  "message": "Access denied by default by the application owner. If you are the administrator of the service, create a specific auth policy for the route."
-}
-401
-```
-
-Test RL policy (bob has higher rate limit than alice)
-
-Alice - 5 req/10s (GW level policy)
-```bash
-for i in {1..10}
-do
-curl -k -so - https://bookinfo.demo.leonlevy.lol/api/v1/products/$i/ratings -H 'Authorization: APIKEY IAMALICE' && echo  
-sleep 1
-done
-```
-
-Output
-
-```json
-{"id": 1, "ratings": {"Reviewer1": 5, "Reviewer2": 4}, "Cluster": "CLUSTER-EAST"}
-{"id": 2, "ratings": {"Reviewer1": 5, "Reviewer2": 4}, "Cluster": "CLUSTER-EAST"}
-{"id": 3, "ratings": {"Reviewer1": 5, "Reviewer2": 4}, "Cluster": "CLUSTER-EAST"}
-{"id": 4, "ratings": {"Reviewer1": 5, "Reviewer2": 4}, "Cluster": "CLUSTER-EAST"}
-{"id": 5, "ratings": {"Reviewer1": 5, "Reviewer2": 4}, "Cluster": "CLUSTER-EAST"}
-
-Too Many Requests
-
-Too Many Requests
-
-Too Many Requests
-
-{"id": 9, "ratings": {"Reviewer1": 5, "Reviewer2": 4}, "Cluster": "CLUSTER-EAST"}
-{"id": 10, "ratings": {"Reviewer1": 5, "Reviewer2": 4}, "Cluster": "CLUSTER-EAST"}
-```
-
-Bob - 20 req/10s (HTTPRoute level RL pol)
-
-```bash
-for i in {1..10}
-do
-curl -k -so - https://bookinfo.demo.leonlevy.lol/api/v1/products/$i/ratings -H 'Authorization: APIKEY IAMBOB' && echo
-sleep 1
-done
-```
-
-Output
-```json
-{"id": 1, "ratings": {"Reviewer1": 5, "Reviewer2": 4}, "Cluster": "CLUSTER-EAST"}
-{"id": 2, "ratings": {"Reviewer1": 5, "Reviewer2": 4}, "Cluster": "CLUSTER-EAST"}
-{"id": 3, "ratings": {"Reviewer1": 5, "Reviewer2": 4}, "Cluster": "CLUSTER-EAST"}
-{"id": 4, "ratings": {"Reviewer1": 5, "Reviewer2": 4}, "Cluster": "CLUSTER-EAST"}
-{"id": 5, "ratings": {"Reviewer1": 5, "Reviewer2": 4}, "Cluster": "CLUSTER-EAST"}
-{"id": 6, "ratings": {"Reviewer1": 5, "Reviewer2": 4}, "Cluster": "CLUSTER-EAST"}
-{"id": 7, "ratings": {"Reviewer1": 5, "Reviewer2": 4}, "Cluster": "CLUSTER-EAST"}
-{"id": 8, "ratings": {"Reviewer1": 5, "Reviewer2": 4}, "Cluster": "CLUSTER-EAST"}
-{"id": 9, "ratings": {"Reviewer1": 5, "Reviewer2": 4}, "Cluster": "CLUSTER-EAST"}
-{"id": 10, "ratings": {"Reviewer1": 5, "Reviewer2": 4}, "Cluster": "CLUSTER-EAST"}
-```

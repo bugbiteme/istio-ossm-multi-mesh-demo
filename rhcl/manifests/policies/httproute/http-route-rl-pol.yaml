@@ -1,21 +1,25 @@
 apiVersion: kuadrant.io/v1
 kind: RateLimitPolicy
 metadata:
-  name: bookinfo-rl
+  name: bookinfo-rlp
   namespace: bookinfo
 spec:
   targetRef:
     group: gateway.networking.k8s.io
     kind: HTTPRoute
     name: bookinfo
-    sectionName: rule-1
   defaults:
-    strategy: merge
+    # strategy: merge
     limits:
       "bob-limit":
         rates:
-
         - limit: 20
           window: 10s
         when:
         - predicate: "auth.identity.userid == 'bob'"
+      "general-limit":        # applies to everyone else (no when condition)
+        rates:
+        - limit: 5
+          window: 10s
+        when:
+        - predicate: "auth.identity.userid != 'bob'"  # excludes Bob
