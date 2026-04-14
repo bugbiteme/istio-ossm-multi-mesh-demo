@@ -13,3 +13,5 @@ __pycache__/
 ansible/multi_cluster/env.sh
 
 *.pem
+
+rhcl/env.sh
