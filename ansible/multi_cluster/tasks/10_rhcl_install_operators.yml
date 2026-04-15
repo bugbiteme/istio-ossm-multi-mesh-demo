@@ -1,0 +1,194 @@
+---
+# Step 10: Red Hat Connectivity Link operator (pulls Authorino, Limitador, etc. via OLM)
+
+- name: "[10.0] Discover RHCL operator manifest files"
+  ansible.builtin.find:
+    paths: "{{ repo_root }}/rhcl/manifests/operators"
+    patterns: "*.yaml,*.yml"
+    file_type: file
+  register: rhcl_operator_manifests
+  changed_when: false
+  tags: [step10]
+
+- name: "[10.0] Require at least one manifest under rhcl/manifests/operators"
+  ansible.builtin.assert:
+    that:
+      - rhcl_operator_manifests.files | length > 0
+    fail_msg: >-
+      rhcl_enabled is true but no *.yaml/*.yml files were found under
+      {{ repo_root }}/rhcl/manifests/operators
+  tags: [step10]
+
+- name: "[10.1] Apply RHCL operator manifests (east)"
+  kubernetes.core.k8s:
+    context: "{{ ctx_east }}"
+    definition: "{{ lookup('file', item.path) | from_yaml_all | list }}"
+    state: present
+    apply: true
+  loop: "{{ rhcl_operator_manifests.files }}"
+  loop_control:
+    label: "{{ item.path | basename }}"
+  tags: [step10]
+
+- name: "[10.1] Apply RHCL operator manifests (west)"
+  kubernetes.core.k8s:
+    context: "{{ ctx_west }}"
+    definition: "{{ lookup('file', item.path) | from_yaml_all | list }}"
+    state: present
+    apply: true
+  loop: "{{ rhcl_operator_manifests.files }}"
+  loop_control:
+    label: "{{ item.path | basename }}"
+  when: multi_cluster | bool
+  tags: [step10]
+
+# CSV name prefixes from OLM packages: rhcl-operator (Connectivity Link), authorino-operator, limitador-operator, dns-operator
+- name: "[10.2] Wait for Connectivity Link stack CSVs to succeed (east)"
+  kubernetes.core.k8s_info:
+    context: "{{ ctx_east }}"
+    api_version: operators.coreos.com/v1alpha1
+    kind: ClusterServiceVersion
+    namespace: openshift-operators
+  register: rhcl_csv_east
+  until: >
+    (
+      rhcl_csv_east.resources | default([])
+      | selectattr('metadata.name', 'match', '^rhcl-operator')
+      | selectattr('status.phase', 'defined')
+      | selectattr('status.phase', 'equalto', 'Succeeded')
+      | list | length > 0
+    ) and (
+      rhcl_csv_east.resources | default([])
+      | selectattr('metadata.name', 'match', '^authorino-operator')
+      | selectattr('status.phase', 'defined')
+      | selectattr('status.phase', 'equalto', 'Succeeded')
+      | list | length > 0
+    ) and (
+      rhcl_csv_east.resources | default([])
+      | selectattr('metadata.name', 'match', '^limitador-operator')
+      | selectattr('status.phase', 'defined')
+      | selectattr('status.phase', 'equalto', 'Succeeded')
+      | list | length > 0
+    ) and (
+      rhcl_csv_east.resources | default([])
+      | selectattr('metadata.name', 'match', '^dns-operator')
+      | selectattr('status.phase', 'defined')
+      | selectattr('status.phase', 'equalto', 'Succeeded')
+      | list | length > 0
+    )
+  retries: 60
+  delay: 20
+  failed_when: >
+    rhcl_csv_east.resources | default([])
+    | selectattr('metadata.name', 'match', '^(rhcl-operator|authorino-operator|limitador-operator|dns-operator)')
+    | selectattr('status.phase', 'defined')
+    | selectattr('status.phase', 'equalto', 'Failed')
+    | list | length > 0
+  tags: [step10]
+
+- name: "[10.2] Wait for Connectivity Link stack CSVs to succeed (west)"
+  kubernetes.core.k8s_info:
+    context: "{{ ctx_west }}"
+    api_version: operators.coreos.com/v1alpha1
+    kind: ClusterServiceVersion
+    namespace: openshift-operators
+  register: rhcl_csv_west
+  until: >
+    (
+      rhcl_csv_west.resources | default([])
+      | selectattr('metadata.name', 'match', '^rhcl-operator')
+      | selectattr('status.phase', 'defined')
+      | selectattr('status.phase', 'equalto', 'Succeeded')
+      | list | length > 0
+    ) and (
+      rhcl_csv_west.resources | default([])
+      | selectattr('metadata.name', 'match', '^authorino-operator')
+      | selectattr('status.phase', 'defined')
+      | selectattr('status.phase', 'equalto', 'Succeeded')
+      | list | length > 0
+    ) and (
+      rhcl_csv_west.resources | default([])
+      | selectattr('metadata.name', 'match', '^limitador-operator')
+      | selectattr('status.phase', 'defined')
+      | selectattr('status.phase', 'equalto', 'Succeeded')
+      | list | length > 0
+    ) and (
+      rhcl_csv_west.resources | default([])
+      | selectattr('metadata.name', 'match', '^dns-operator')
+      | selectattr('status.phase', 'defined')
+      | selectattr('status.phase', 'equalto', 'Succeeded')
+      | list | length > 0
+    )
+  retries: 60
+  delay: 20
+  failed_when: >
+    rhcl_csv_west.resources | default([])
+    | selectattr('metadata.name', 'match', '^(rhcl-operator|authorino-operator|limitador-operator|dns-operator)')
+    | selectattr('status.phase', 'defined')
+    | selectattr('status.phase', 'equalto', 'Failed')
+    | list | length > 0
+  when: multi_cluster | bool
+  tags: [step10]
+
+# Console dynamic plugin (see rhcl/README.md — kuadrant-console-plugin)
+- name: "[10.3] Read cluster Console operator (east)"
+  kubernetes.core.k8s_info:
+    context: "{{ ctx_east }}"
+    api_version: operator.openshift.io/v1
+    kind: Console
+    name: cluster
+  register: console_east_plugins
+  tags: [step10]
+
+- name: "[10.3] Enable Kuadrant / RHCL console plugin (east)"
+  kubernetes.core.k8s_json_patch:
+    context: "{{ ctx_east }}"
+    api_version: operator.openshift.io/v1
+    kind: Console
+    name: cluster
+    patch: "{{ rhcl_console_patch_ops_east }}"
+  vars:
+    rhcl_console_cur_plugins_east: "{{ (console_east_plugins.resources[0].spec | default({})).plugins | default([]) }}"
+    rhcl_console_next_plugins_east: "{{ rhcl_console_cur_plugins_east | union(['kuadrant-console-plugin']) | list }}"
+    rhcl_console_patch_ops_east: >-
+      {{
+        [{'op': 'add', 'path': '/spec/plugins', 'value': rhcl_console_next_plugins_east}]
+        if 'plugins' not in (console_east_plugins.resources[0].spec | default({}))
+        else [{'op': 'replace', 'path': '/spec/plugins', 'value': rhcl_console_next_plugins_east}]
+      }}
+  when:
+    - console_east_plugins.resources | length > 0
+    - "'kuadrant-console-plugin' not in rhcl_console_cur_plugins_east"
+  tags: [step10]
+
+- name: "[10.3] Kuadrant console plugin (west cluster)"
+  when: multi_cluster | bool
+  tags: [step10]
+  block:
+    - name: "[10.3] Read cluster Console operator (west)"
+      kubernetes.core.k8s_info:
+        context: "{{ ctx_west }}"
+        api_version: operator.openshift.io/v1
+        kind: Console
+        name: cluster
+      register: console_west_plugins
+
+    - name: "[10.3] Enable Kuadrant / RHCL console plugin (west)"
+      kubernetes.core.k8s_json_patch:
+        context: "{{ ctx_west }}"
+        api_version: operator.openshift.io/v1
+        kind: Console
+        name: cluster
+        patch: "{{ rhcl_console_patch_ops_west }}"
+      vars:
+        rhcl_console_cur_plugins_west: "{{ (console_west_plugins.resources[0].spec | default({})).plugins | default([]) }}"
+        rhcl_console_next_plugins_west: "{{ rhcl_console_cur_plugins_west | union(['kuadrant-console-plugin']) | list }}"
+        rhcl_console_patch_ops_west: >-
+          {{
+            [{'op': 'add', 'path': '/spec/plugins', 'value': rhcl_console_next_plugins_west}]
+            if 'plugins' not in (console_west_plugins.resources[0].spec | default({}))
+            else [{'op': 'replace', 'path': '/spec/plugins', 'value': rhcl_console_next_plugins_west}]
+          }}
+      when:
+        - console_west_plugins.resources | length > 0
+        - "'kuadrant-console-plugin' not in rhcl_console_cur_plugins_west"

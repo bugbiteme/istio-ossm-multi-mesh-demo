@@ -15,6 +15,7 @@
     definition: "{{ lookup('kubernetes.core.kustomize', dir=repo_root ~ '/manifests/operators') }}"
     state: present
     apply: true
+  when: multi_cluster | bool
   tags: [step3]
 
 - name: "[3.1] Check current CSV phases (east)"
@@ -73,6 +74,7 @@
     api_version: operators.coreos.com/v1alpha1
     kind: ClusterServiceVersion
     namespace: openshift-operators
+  when: multi_cluster | bool
   register: west_csv_list_pre
   tags: [step3]
 
@@ -96,17 +98,19 @@
   delay: 20
   failed_when: >
     west_csv_list.resources | selectattr('status.phase', 'defined') | selectattr('status.phase', 'equalto', 'Failed') | list | length > 0
-  when: >
-    west_csv_list_pre.resources | length == 0 or
-    (
-      west_csv_list_pre.resources
-      | map(attribute='status', default={})
-      | map(attribute='phase', default='')
-      | list
-      | select('in', ['Installing', 'Pending', ''])
-      | list
-      | length
-    ) > 0
+  when:
+    - multi_cluster | bool
+    - >
+      west_csv_list_pre.resources | length == 0 or
+      (
+        west_csv_list_pre.resources
+        | map(attribute='status', default={})
+        | map(attribute='phase', default='')
+        | list
+        | select('in', ['Installing', 'Pending', ''])
+        | list
+        | length
+      ) > 0
   tags: [step3]
 
 - name: "[3.1] Show CSV phases (west)"
@@ -115,4 +119,5 @@
   loop: "{{ ((west_csv_list | default({})).resources) | default(west_csv_list_pre.resources) }}"
   loop_control:
     label: "{{ item.metadata.name }}"
+  when: multi_cluster | bool
   tags: [step3]

@@ -6,7 +6,7 @@
 #   ansible-playbook site.yml --tags step5        # run a single step
 #   ansible-playbook site.yml --skip-tags step2   # skip istioctl install (Dev Spaces)
 #
-# Available tags: preflight step1 step2 step3…step9 (no separate “verify” step; see preflight)
+# Available tags: preflight step1 step2 step3…step16 (no separate “verify” step; see preflight)
 #   preflight = API checks for contexts that already exist in kubeconfig
 #   step1 = require admin-east / admin-west in kubeconfig (README §1.1–1.2) + optional console banners
 
@@ -64,11 +64,12 @@
 
   tasks:
     - name: "Step 1 | Verify kubeconfig contexts (east/west) and optional console banners"
-      ansible.builtin.import_tasks: tasks/01_rename_contexts.yml
+      ansible.builtin.import_tasks: tasks/01_check_contexts.yml
       tags: [step1]
 
     - name: "Step 2 | Install istioctl (skip with --skip-tags step2 for Dev Spaces)"
       ansible.builtin.import_tasks: tasks/02_install_istioctl.yml
+      when: multi_cluster | bool
       tags: [step2]
 
     - name: "Step 3 | Install operators on both clusters"
@@ -81,6 +82,7 @@
 
     - name: "Step 5 | Create shared root CA"
       ansible.builtin.import_tasks: tasks/05_root_ca.yml
+      when: multi_cluster | bool
       tags: [step5]
 
     - name: "Step 6 | Install tracing system"
@@ -98,3 +100,38 @@
     - name: "Step 9 | Bookinfo app"
       ansible.builtin.import_tasks: tasks/09_bookinfo.yml
       tags: [step9]
+
+    - name: "Step 10 | RHCL / Connectivity Link operators"
+      ansible.builtin.import_tasks: tasks/10_rhcl_install_operators.yml
+      when: rhcl_enabled | bool
+      tags: [step10]
+
+    - name: "Step 11 | Kuadrant system (namespace + Kuadrant CR)"
+      ansible.builtin.import_tasks: tasks/11_rhcl_deploy_kuadrant_system.yml
+      when: rhcl_enabled | bool
+      tags: [step11]
+
+    - name: "Step 12 | RHCL TLS — Route53 secrets + ClusterIssuer (letsencrypt)"
+      ansible.builtin.import_tasks: tasks/12_rhcl_tls_dns_setup.yml
+      when: rhcl_enabled | bool
+      tags: [step12]
+
+    - name: "Step 13 | Kuadrant-enabled Gateway (apply + status checks)"
+      ansible.builtin.import_tasks: tasks/13_rhcl_enabled_gw.yml
+      when: rhcl_enabled | bool
+      tags: [step13]
+
+    - name: "Step 14 | RHCL TLSPolicy (prod-gateway TLS)"
+      ansible.builtin.import_tasks: tasks/14_rhcl_apply_tls_policy.yml
+      when: rhcl_enabled | bool
+      tags: [step14]
+
+    - name: "Step 15 | RHCL DNSPolicy (prod-gateway DNS)"
+      ansible.builtin.import_tasks: tasks/15_rhcl_apply_dns_policy.yml
+      when: rhcl_enabled | bool
+      tags: [step15]
+
+    - name: "Step 16 | Bookinfo HTTPRoute for RHCL gateway"
+      ansible.builtin.import_tasks: tasks/16_rhcl_update_bookinfo_httproute.yml
+      when: rhcl_enabled | bool
+      tags: [step16]

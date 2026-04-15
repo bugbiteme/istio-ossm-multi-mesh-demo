@@ -27,12 +27,12 @@
   changed_when: true
   tags: [step1]
 
-# Skipped when apply_console_notifications is false. Best-effort: does not fail step1 if API is unreachable.
+# Skipped when multi_cluster is false. 
 - name: "[1.1] Apply east console notification banner (optional)"
   ansible.builtin.command: >
     oc --context="{{ ctx_east }}"
     apply -f {{ repo_root }}/manifests/cluster/east/console-notification.yaml
-  when: apply_console_notifications | bool
+  when: multi_cluster | bool
   register: east_console_banner
   failed_when: false
   changed_when: east_console_banner.rc == 0
@@ -48,7 +48,7 @@
           or set apply_console_notifications: false.
       - "stderr: {{ (east_console_banner.stderr | default('')) | trim }}"
   when:
-    - apply_console_notifications | bool
+    - multi_cluster | bool
     - not (east_console_banner.skipped | default(false))
     - (east_console_banner.rc | default(-1)) != 0
   tags: [step1]
@@ -57,6 +57,7 @@
 
 - name: "[1.2] Check kubeconfig context {{ ctx_west }}"
   ansible.builtin.command: oc config get-contexts {{ ctx_west }}
+  when: multi_cluster | bool
   register: west_ctx_check
   changed_when: false
   failed_when: false
@@ -70,10 +71,12 @@
       Context {{ ctx_west }} is missing from kubeconfig. Log into the west cluster,
       run oc config rename-context on the current context to {{ ctx_west }}, then re-run
       (see repository README.md §1.2 West cluster).
+  when: multi_cluster | bool
   tags: [step1]
 
 - name: "[1.2] Switch active context to {{ ctx_west }}"
   ansible.builtin.command: "oc config use-context {{ ctx_west }}"
+  when: multi_cluster | bool
   changed_when: true
   tags: [step1]
 
@@ -82,7 +85,7 @@
   ansible.builtin.command: >
     oc --context="{{ ctx_west }}"
     apply -f {{ repo_root }}/manifests/cluster/west/console-notification.yaml
-  when: apply_console_notifications | bool
+  when: multi_cluster | bool
   register: west_console_banner
   failed_when: false
   changed_when: west_console_banner.rc == 0
@@ -98,7 +101,7 @@
           or set apply_console_notifications: false.
       - "stderr: {{ (west_console_banner.stderr | default('')) | trim }}"
   when:
-    - apply_console_notifications | bool
+    - multi_cluster | bool
     - not (west_console_banner.skipped | default(false))
     - (west_console_banner.rc | default(-1)) != 0
   tags: [step1]

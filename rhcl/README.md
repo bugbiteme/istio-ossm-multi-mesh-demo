@@ -223,9 +223,9 @@ These examples assume you use the Kubernetes Gateway created for the **bookinfo*
 oc -n ingress-gateway apply -f rhcl/manifests/policies/gateway/gw-auth-pol.yaml
 ```
 
-before applying you will get a response 
+before applying you will get a response (skips TLS verification)
 ```bash
-curl -k -so - -w "%{http_code}\n" https://bookinfo.demo.leonlevy.lol/api/v1/products/0/ratings    
+curl -k -w "%{http_code}\n" https://bookinfo.demo.leonlevy.lol/api/v1/products/0/ratings  
 ```
 
 Output:

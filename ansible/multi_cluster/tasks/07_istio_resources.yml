@@ -19,6 +19,7 @@
     definition: "{{ lookup('kubernetes.core.kustomize', dir=repo_root ~ '/manifests/ossm/istio-cni') }}"
     state: present
     apply: true
+  when: multi_cluster | bool
   tags: [step7]
 
 - name: "[7.1] Wait for istio-cni-node daemonset rollout (east)"
@@ -53,6 +54,7 @@
     (west_cni_ds.resources[0].status.desiredNumberScheduled | default(0) | int)
   retries: 60
   delay: 5
+  when: multi_cluster | bool
   tags: [step7]
 
 # --- 7.2 Istio control plane ---
@@ -71,6 +73,7 @@
     definition: "{{ lookup('kubernetes.core.kustomize', dir=repo_root ~ '/manifests/ossm/istio-system/overlays/west') }}"
     state: present
     apply: true
+  when: multi_cluster | bool
   tags: [step7]
 
 - name: "[7.2] Wait for Istio control plane to be ready (east)"
@@ -107,6 +110,7 @@
     ) == 'True'
   retries: 60
   delay: 5
+  when: multi_cluster | bool
   tags: [step7]
 
 - name: "[7.2] Verify istio-ca-root-cert ConfigMap exists (east)"
@@ -116,6 +120,7 @@
     kind: ConfigMap
     name: istio-ca-root-cert
     namespace: istio-system
+  when: multi_cluster | bool
   register: east_ca_cm
   failed_when: east_ca_cm.resources | length == 0
   tags: [step7]
@@ -127,6 +132,7 @@
     kind: ConfigMap
     name: istio-ca-root-cert
     namespace: istio-system
+  when: multi_cluster | bool
   register: west_ca_cm
   failed_when: west_ca_cm.resources | length == 0
   tags: [step7]
@@ -139,6 +145,7 @@
     src: "{{ repo_root }}/manifests/ossm/eastwest-gateway/east/eastwest-gateway.yaml"
     state: present
     apply: true
+  when: multi_cluster | bool
   tags: [step7]
 
 - name: "[7.3] Deploy east-west gateway (west)"
@@ -147,6 +154,7 @@
     src: "{{ repo_root }}/manifests/ossm/eastwest-gateway/west/eastwest-gateway.yaml"
     state: present
     apply: true
+  when: multi_cluster | bool
   tags: [step7]
 
 - name: "[7.3] Wait for east-west gateway rollout (east)"
@@ -156,6 +164,7 @@
     kind: Deployment
     name: istio-eastwestgateway
     namespace: istio-system
+  when: multi_cluster | bool
   register: east_ew_dep
   until: >
     east_ew_dep.resources | length > 0 and
@@ -173,6 +182,7 @@
     kind: Deployment
     name: istio-eastwestgateway
     namespace: istio-system
+  when: multi_cluster | bool
   register: west_ew_dep
   until: >
     west_ew_dep.resources | length > 0 and
@@ -190,6 +200,7 @@
     kind: Service
     name: istio-eastwestgateway
     namespace: istio-system
+  when: multi_cluster | bool
   register: east_ew_svc
   until: >
     east_ew_svc.resources | length > 0 and
@@ -205,6 +216,7 @@
     kind: Service
     name: istio-eastwestgateway
     namespace: istio-system
+  when: multi_cluster | bool
   register: west_ew_svc
   until: >
     west_ew_svc.resources | length > 0 and
@@ -221,6 +233,7 @@
     west_gw_addr: >-
       {{ (west_ew_svc.resources[0].status.loadBalancer.ingress[0].ip | default('', true))
       ~ (west_ew_svc.resources[0].status.loadBalancer.ingress[0].hostname | default('', true)) }}
+  when: multi_cluster | bool
   tags: [step7]
 
 - name: "[7.3] Show gateway addresses"
@@ -228,6 +241,7 @@
     msg:
       - "East gateway: {{ east_gw_addr }}"
       - "West gateway: {{ west_gw_addr }}"
+  when: multi_cluster | bool
   tags: [step7]
 
 # --- 7.4 Expose services through east-west gateways ---
@@ -238,6 +252,7 @@
     src: "{{ repo_root }}/manifests/ossm/eastwest-gateway/common/cross-network-gateway.yaml"
     state: present
     apply: true
+  when: multi_cluster | bool
   tags: [step7]
 
 - name: "[7.4] Apply cross-network-gateway resources (west)"
@@ -246,6 +261,7 @@
     src: "{{ repo_root }}/manifests/ossm/eastwest-gateway/common/cross-network-gateway.yaml"
     state: present
     apply: true
+  when: multi_cluster | bool
   tags: [step7]
 
 # --- 7.5 Cross-cluster endpoint discovery ---
@@ -261,6 +277,7 @@
   args:
     executable: /bin/bash
   changed_when: true
+  when: multi_cluster | bool
   tags: [step7]
 
 - name: "[7.5] Create remote secret for east cluster and apply to west"
@@ -274,18 +291,21 @@
   args:
     executable: /bin/bash
   changed_when: true
+  when: multi_cluster | bool
   tags: [step7]
 
 - name: "[7.5] Verify remote cluster status (east sees west)"
   ansible.builtin.command: "istioctl --context={{ ctx_east }} remote-clusters"
   register: east_remote_clusters
   changed_when: false
+  when: multi_cluster | bool
   tags: [step7]
 
 - name: "[7.5] Verify remote cluster status (west sees east)"
   ansible.builtin.command: "istioctl --context={{ ctx_west }} remote-clusters"
   register: west_remote_clusters
   changed_when: false
+  when: multi_cluster | bool
   tags: [step7]
 
 - name: "[7.5] Show remote cluster sync status"
@@ -293,6 +313,7 @@
     msg:
       - "East remote clusters: {{ east_remote_clusters.stdout_lines }}"
       - "West remote clusters: {{ west_remote_clusters.stdout_lines }}"
+  when: multi_cluster | bool
   tags: [step7]
 
 - name: "[7.5] Assert both clusters show synced status"
@@ -302,6 +323,7 @@
       - "'synced' in west_remote_clusters.stdout"
     fail_msg: "One or both clusters are not synced. Check remote secret configuration."
     success_msg: "Both clusters are synced."
+  when: multi_cluster | bool
   tags: [step7]
 
 # --- 7.6 Ingress gateway ---

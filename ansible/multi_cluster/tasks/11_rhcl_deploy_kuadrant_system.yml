@@ -1,0 +1,182 @@
+---
+# Step 11: Kuadrant system namespace + CR (rhcl/manifests/kuadrant-system)
+
+- name: "[11.0] Discover Kuadrant system manifest files"
+  ansible.builtin.find:
+    paths: "{{ repo_root }}/rhcl/manifests/kuadrant-system"
+    patterns: "*.yaml,*.yml"
+    file_type: file
+  register: kuadrant_system_manifests
+  changed_when: false
+  tags: [step11]
+
+- name: "[11.0] Require at least one manifest under rhcl/manifests/kuadrant-system"
+  ansible.builtin.assert:
+    that:
+      - kuadrant_system_manifests.files | length > 0
+    fail_msg: >-
+      rhcl_enabled is true but no *.yaml/*.yml files were found under
+      {{ repo_root }}/rhcl/manifests/kuadrant-system
+  tags: [step11]
+
+- name: "[11.1] Apply Kuadrant system manifests (east)"
+  kubernetes.core.k8s:
+    context: "{{ ctx_east }}"
+    definition: "{{ lookup('file', item.path) | from_yaml_all | list }}"
+    state: present
+    apply: true
+  loop: "{{ kuadrant_system_manifests.files }}"
+  loop_control:
+    label: "{{ item.path | basename }}"
+  tags: [step11]
+
+- name: "[11.1] Apply Kuadrant system manifests (west)"
+  kubernetes.core.k8s:
+    context: "{{ ctx_west }}"
+    definition: "{{ lookup('file', item.path) | from_yaml_all | list }}"
+    state: present
+    apply: true
+  loop: "{{ kuadrant_system_manifests.files }}"
+  loop_control:
+    label: "{{ item.path | basename }}"
+  when: multi_cluster | bool
+  tags: [step11]
+
+# Rollouts first (same idea as tracing-system); then confirm every pod is Running with all containers ready.
+- name: "[11.2] Wait for kuadrant-system rollouts (east)"
+  ansible.builtin.shell: |
+    set -euo pipefail
+    ctx="{{ ctx_east }}"
+    ns=kuadrant-system
+    for kind in deploy sts ds; do
+      oc --context="$ctx" get "$kind" -n "$ns" -o name 2>/dev/null | while read -r res; do
+        oc --context="$ctx" rollout status "$res" -n "$ns" --timeout=600s
+      done
+    done
+  args:
+    executable: /bin/bash
+  changed_when: false
+  tags: [step11]
+
+- name: "[11.2] Wait for kuadrant-system rollouts (west)"
+  ansible.builtin.shell: |
+    set -euo pipefail
+    ctx="{{ ctx_west }}"
+    ns=kuadrant-system
+    for kind in deploy sts ds; do
+      oc --context="$ctx" get "$kind" -n "$ns" -o name 2>/dev/null | while read -r res; do
+        oc --context="$ctx" rollout status "$res" -n "$ns" --timeout=600s
+      done
+    done
+  args:
+    executable: /bin/bash
+  changed_when: false
+  when: multi_cluster | bool
+  tags: [step11]
+
+- name: "[11.3] Wait for all kuadrant-system pods Running and ready (east)"
+  kubernetes.core.k8s_info:
+    context: "{{ ctx_east }}"
+    api_version: v1
+    kind: Pod
+    namespace: kuadrant-system
+  register: kuadrant_pods_east
+  until: >
+    (kuadrant_pods_east.resources | default([]) | length > 0) and
+    (
+      kuadrant_pods_east.resources
+      | rejectattr('metadata.deletionTimestamp', 'defined')
+      | map(attribute='status.phase', default='')
+      | list | unique == ['Running']
+    ) and
+    (
+      (
+        kuadrant_pods_east.resources
+        | rejectattr('metadata.deletionTimestamp', 'defined')
+        | map(attribute='status.containerStatuses', default=[])
+        | flatten
+        | selectattr('ready', 'defined')
+        | selectattr('ready', 'equalto', true)
+        | list
+        | length
+      )
+      ==
+      (
+        kuadrant_pods_east.resources
+        | rejectattr('metadata.deletionTimestamp', 'defined')
+        | map(attribute='status.containerStatuses', default=[])
+        | flatten
+        | list
+        | length
+      )
+    ) and
+    (
+      kuadrant_pods_east.resources
+      | rejectattr('metadata.deletionTimestamp', 'defined')
+      | map(attribute='status.containerStatuses', default=[])
+      | flatten
+      | list
+      | length
+    ) > 0
+  retries: 60
+  delay: 15
+  failed_when: >
+    (kuadrant_pods_east.resources | default([])
+    | selectattr('status.phase', 'defined')
+    | selectattr('status.phase', 'equalto', 'Failed')
+    | list | length) > 0
+  tags: [step11]
+
+- name: "[11.3] Wait for all kuadrant-system pods Running and ready (west)"
+  kubernetes.core.k8s_info:
+    context: "{{ ctx_west }}"
+    api_version: v1
+    kind: Pod
+    namespace: kuadrant-system
+  register: kuadrant_pods_west
+  until: >
+    (kuadrant_pods_west.resources | default([]) | length > 0) and
+    (
+      kuadrant_pods_west.resources
+      | rejectattr('metadata.deletionTimestamp', 'defined')
+      | map(attribute='status.phase', default='')
+      | list | unique == ['Running']
+    ) and
+    (
+      (
+        kuadrant_pods_west.resources
+        | rejectattr('metadata.deletionTimestamp', 'defined')
+        | map(attribute='status.containerStatuses', default=[])
+        | flatten
+        | selectattr('ready', 'defined')
+        | selectattr('ready', 'equalto', true)
+        | list
+        | length
+      )
+      ==
+      (
+        kuadrant_pods_west.resources
+        | rejectattr('metadata.deletionTimestamp', 'defined')
+        | map(attribute='status.containerStatuses', default=[])
+        | flatten
+        | list
+        | length
+      )
+    ) and
+    (
+      kuadrant_pods_west.resources
+      | rejectattr('metadata.deletionTimestamp', 'defined')
+      | map(attribute='status.containerStatuses', default=[])
+      | flatten
+      | list
+      | length
+    ) > 0
+  retries: 60
+  delay: 15
+  failed_when: >
+    (kuadrant_pods_west.resources | default([])
+    | selectattr('status.phase', 'defined')
+    | selectattr('status.phase', 'equalto', 'Failed')
+    | list | length) > 0
+  when: multi_cluster | bool
+  tags: [step11]

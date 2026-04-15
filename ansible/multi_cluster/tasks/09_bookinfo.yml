@@ -17,6 +17,7 @@
     definition: "{{ lookup('kubernetes.core.kustomize', dir=repo_root ~ '/manifests/bookinfo/app/west') }}"
     state: present
     apply: true
+  when: multi_cluster | bool
   tags: [step9]
 
 # --- 9.3 Collect gateway URL ---

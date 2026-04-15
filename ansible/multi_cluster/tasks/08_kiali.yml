@@ -46,6 +46,7 @@
     namespace: tracing-system
   register: west_tempo_ca_secret
   failed_when: west_tempo_ca_secret.resources | length == 0
+  when: multi_cluster | bool
   tags: [step8]
 
 - name: "[8] Write Tempo signing CA to local file (west)"
@@ -53,6 +54,7 @@
     dest: "{{ repo_root }}/certs/ca-west.crt"
     content: "{{ west_tempo_ca_secret.resources[0].data['tls.crt'] | b64decode }}"
     mode: "0600"
+  when: multi_cluster | bool
   tags: [step8]
 
 - name: "[8] Create cacert secret in istio-system (west)"
@@ -69,6 +71,7 @@
         ca.crt: "{{ lookup('ansible.builtin.file', repo_root ~ '/certs/ca-west.crt') }}"
     state: present
     apply: true
+  when: multi_cluster | bool
   tags: [step8]
 
 # --- Apply Kiali CR ---
@@ -95,6 +98,7 @@
     - "{{ repo_root }}/manifests/ossm/kiali/kiali-monitoring-rbac.yaml"
     - "{{ repo_root }}/manifests/ossm/kiali/kiali-ossmc.yaml"
     - "{{ repo_root }}/manifests/ossm/kiali/kiali.yaml"
+  when: multi_cluster | bool
   tags: [step8]
 
 - name: "[8] Wait for Kiali deployment to be ready (east)"
@@ -129,4 +133,5 @@
     (west_kiali_dep.resources[0].status.replicas | default(0) | int)
   retries: 60
   delay: 5
+  when: multi_cluster | bool
   tags: [step8]

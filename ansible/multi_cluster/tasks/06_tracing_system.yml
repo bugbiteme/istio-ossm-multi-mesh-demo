@@ -1,7 +1,22 @@
 ---
 # Step 6: Install the tracing system (MinIO + Tempo stack) on both clusters
+- name: "[6] Wait for Tempo operator controller to be ready before applying TempoStack"
+  kubernetes.core.k8s_info:
+    context: "{{ ctx_east }}"
+    api_version: v1
+    kind: Endpoints
+    name: tempo-operator-controller-service
+    namespace: openshift-operators
+  register: tempo_ep
+  until: >
+    tempo_ep.resources | length > 0 and
+    (tempo_ep.resources[0].subsets | default([]) | length > 0) and
+    (tempo_ep.resources[0].subsets[0].addresses | default([]) | length > 0)
+  retries: 30
+  delay: 10
+  tags: [step6]
 
-- name: "[6] Apply tracing-system kustomization (east)"
+- name: "[6.1] Apply tracing-system kustomization (east)"
   kubernetes.core.k8s:
     context: "{{ ctx_east }}"
     definition: "{{ lookup('kubernetes.core.kustomize', dir=repo_root ~ '/manifests/tracing-system') }}"
@@ -9,16 +24,17 @@
     apply: true
   tags: [step6]
 
-- name: "[6] Apply tracing-system kustomization (west)"
+- name: "[6.2] Apply tracing-system kustomization (west)"
   kubernetes.core.k8s:
     context: "{{ ctx_west }}"
     definition: "{{ lookup('kubernetes.core.kustomize', dir=repo_root ~ '/manifests/tracing-system') }}"
     state: present
     apply: true
+  when: multi_cluster | bool
   tags: [step6]
 
 # Avoid `oc wait pod --all`: during Deployments/STS rollouts, pod names disappear and wait fails with NotFound.
-- name: "[6.1] Wait for tracing-system rollouts complete (east)"
+- name: "[6.3] Wait for tracing-system rollouts complete (east)"
   ansible.builtin.shell: |
     set -euo pipefail
     ctx="{{ ctx_east }}"
@@ -34,7 +50,7 @@
   changed_when: false
   tags: [step6]
 
-- name: "[6.1] Wait for tracing-system rollouts complete (west)"
+- name: "[6.4] Wait for tracing-system rollouts complete (west)"
   ansible.builtin.shell: |
     set -euo pipefail
     ctx="{{ ctx_west }}"
@@ -48,4 +64,5 @@
   args:
     executable: /bin/bash
   changed_when: false
+  when: multi_cluster | bool
   tags: [step6]

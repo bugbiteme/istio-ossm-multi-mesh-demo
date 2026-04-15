@@ -1,0 +1,123 @@
+---
+# Step 14: TLSPolicy for prod-gateway (rhcl/README.md §5 steps 8–9)
+
+- name: "[14.1] Apply TLSPolicy (ingress-gateway, east)"
+  kubernetes.core.k8s:
+    context: "{{ ctx_east }}"
+    definition: "{{ lookup('file', repo_root ~ '/rhcl/manifests/tls-setup/tls-policy.yaml') | from_yaml }}"
+    state: present
+    apply: true
+  tags: [step14]
+
+- name: "[14.1] Apply TLSPolicy (ingress-gateway, west)"
+  kubernetes.core.k8s:
+    context: "{{ ctx_west }}"
+    definition: "{{ lookup('file', repo_root ~ '/rhcl/manifests/tls-setup/tls-policy.yaml') | from_yaml }}"
+    state: present
+    apply: true
+  when: multi_cluster | bool
+  tags: [step14]
+
+- name: "[14.2] Wait for TLSPolicy Accepted and Enforced (east)"
+  kubernetes.core.k8s_info:
+    context: "{{ ctx_east }}"
+    api_version: kuadrant.io/v1
+    kind: TLSPolicy
+    name: prod-gateway-tls
+    namespace: ingress-gateway
+  register: rhcl_tls_policy_east
+  until: >
+    rhcl_tls_policy_east.resources | length > 0 and
+    (
+      rhcl_tls_policy_east.resources[0].status.conditions | default([])
+      | selectattr('type', 'equalto', 'Accepted')
+      | map(attribute='status')
+      | first | default('')
+      == 'True'
+    ) and
+    (
+      rhcl_tls_policy_east.resources[0].status.conditions | default([])
+      | selectattr('type', 'equalto', 'Enforced')
+      | map(attribute='status')
+      | first | default('')
+      == 'True'
+    )
+  retries: 60
+  delay: 15
+  failed_when: >
+    rhcl_tls_policy_east.resources | length > 0 and
+    (
+      (
+        rhcl_tls_policy_east.resources[0].status.conditions | default([])
+        | selectattr('type', 'equalto', 'Accepted')
+        | map(attribute='status')
+        | first | default('')
+      ) == 'False'
+    )
+  tags: [step14]
+
+- name: "[14.2] Wait for TLSPolicy Accepted and Enforced (west)"
+  kubernetes.core.k8s_info:
+    context: "{{ ctx_west }}"
+    api_version: kuadrant.io/v1
+    kind: TLSPolicy
+    name: prod-gateway-tls
+    namespace: ingress-gateway
+  register: rhcl_tls_policy_west
+  until: >
+    rhcl_tls_policy_west.resources | length > 0 and
+    (
+      rhcl_tls_policy_west.resources[0].status.conditions | default([])
+      | selectattr('type', 'equalto', 'Accepted')
+      | map(attribute='status')
+      | first | default('')
+      == 'True'
+    ) and
+    (
+      rhcl_tls_policy_west.resources[0].status.conditions | default([])
+      | selectattr('type', 'equalto', 'Enforced')
+      | map(attribute='status')
+      | first | default('')
+      == 'True'
+    )
+  retries: 60
+  delay: 15
+  failed_when: >
+    rhcl_tls_policy_west.resources | length > 0 and
+    (
+      (
+        rhcl_tls_policy_west.resources[0].status.conditions | default([])
+        | selectattr('type', 'equalto', 'Accepted')
+        | map(attribute='status')
+        | first | default('')
+      ) == 'False'
+    )
+  when: multi_cluster | bool
+  tags: [step14]
+
+- name: "[14.3] TLSPolicy Accepted / Enforced messages (east)"
+  ansible.builtin.debug:
+    msg:
+      accepted: >-
+        {{ rhcl_tls_policy_east.resources[0].status.conditions | default([])
+        | selectattr('type', 'equalto', 'Accepted')
+        | map(attribute='message') | first | default('(none)') }}
+      enforced: >-
+        {{ rhcl_tls_policy_east.resources[0].status.conditions | default([])
+        | selectattr('type', 'equalto', 'Enforced')
+        | map(attribute='message') | first | default('(none)') }}
+  tags: [step14]
+
+- name: "[14.3] TLSPolicy Accepted / Enforced messages (west)"
+  ansible.builtin.debug:
+    msg:
+      accepted: >-
+        {{ rhcl_tls_policy_west.resources[0].status.conditions | default([])
+        | selectattr('type', 'equalto', 'Accepted')
+        | map(attribute='message') | first | default('(none)') }}
+      enforced: >-
+        {{ rhcl_tls_policy_west.resources[0].status.conditions | default([])
+        | selectattr('type', 'equalto', 'Enforced')
+        | map(attribute='message') | first | default('(none)') }}
+  when: multi_cluster | bool
+  tags: [step14]

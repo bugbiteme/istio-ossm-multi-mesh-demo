@@ -19,5 +19,14 @@ istio_version: "1.27.5"
 
 # Repository root is set in site.yml (play vars); playbook_dir is unset/wrong while vars_files are templated.
 
-# Set to true to apply optional web-console notification banners (best-effort oc apply in step 1)
-apply_console_notifications: true
+# Set to true to run the multi-cluster tasks in playbook, false to run the single-cluster tasks
+multi_cluster: false
+
+# Set to true to enable RHCL deployment, false to skip
+rhcl_enabled: true
+
+# Set to true to enable minimal Istio deployment for RHCL, false to use full Istio control plane
+rhcl_minimal_istio: false
+
+# Set to true if you want to automate the DNS setup for the RHCL Gateway, otherwise manual setup of hosted zone records is required in Route 53
+rhcl_dns_automation: false

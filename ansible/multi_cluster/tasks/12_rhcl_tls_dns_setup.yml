@@ -1,0 +1,129 @@
+---
+# Step 12: Route53 credentials for Kuadrant + cert-manager, ClusterIssuer (letsencrypt)
+# Requires controller env (see rhcl/README.md §5): KUADRANT_AWS_ACCESS_KEY_ID,
+# KUADRANT_AWS_SECRET_ACCESS_KEY, KUADRANT_AWS_DNS_PUBLIC_ZONE_ID
+
+- name: "[12.0] Require Kuadrant / TLS AWS environment variables"
+  ansible.builtin.assert:
+    that:
+      - (lookup('env', 'KUADRANT_AWS_ACCESS_KEY_ID') | default('', true) | length) > 0
+      - (lookup('env', 'KUADRANT_AWS_SECRET_ACCESS_KEY') | default('', true) | length) > 0
+      - (lookup('env', 'KUADRANT_AWS_DNS_PUBLIC_ZONE_ID') | default('', true) | length) > 0
+    fail_msg: >-
+      Set KUADRANT_AWS_ACCESS_KEY_ID, KUADRANT_AWS_SECRET_ACCESS_KEY, and
+      KUADRANT_AWS_DNS_PUBLIC_ZONE_ID in the environment before running step12.
+  tags: [step12]
+
+- name: "[12.1] Secret for Kuadrant DNS integration (ingress-gateway, east)"
+  kubernetes.core.k8s:
+    context: "{{ ctx_east }}"
+    state: present
+    apply: true
+    definition:
+      apiVersion: v1
+      kind: Secret
+      metadata:
+        name: aws-credentials
+        namespace: ingress-gateway
+      type: kuadrant.io/aws
+      stringData:
+        AWS_ACCESS_KEY_ID: "{{ lookup('env', 'KUADRANT_AWS_ACCESS_KEY_ID') }}"
+        AWS_SECRET_ACCESS_KEY: "{{ lookup('env', 'KUADRANT_AWS_SECRET_ACCESS_KEY') }}"
+  tags: [step12]
+
+- name: "[12.2] Secret for cert-manager (cert-manager, east)"
+  kubernetes.core.k8s:
+    context: "{{ ctx_east }}"
+    state: present
+    apply: true
+    definition:
+      apiVersion: v1
+      kind: Secret
+      metadata:
+        name: aws-credentials
+        namespace: cert-manager
+      type: kuadrant.io/aws
+      stringData:
+        AWS_ACCESS_KEY_ID: "{{ lookup('env', 'KUADRANT_AWS_ACCESS_KEY_ID') }}"
+        AWS_SECRET_ACCESS_KEY: "{{ lookup('env', 'KUADRANT_AWS_SECRET_ACCESS_KEY') }}"
+  tags: [step12]
+
+- name: "[12.3] ClusterIssuer letsencrypt (Route53 DNS01, east)"
+  kubernetes.core.k8s:
+    context: "{{ ctx_east }}"
+    state: present
+    apply: true
+    definition: "{{ lookup('file', repo_root ~ '/rhcl/manifests/tls-setup/cluster-issuer.yaml') | replace('${KUADRANT_AWS_DNS_PUBLIC_ZONE_ID}', lookup('env', 'KUADRANT_AWS_DNS_PUBLIC_ZONE_ID')) | from_yaml }}"
+  tags: [step12]
+
+- name: "[12.4] Wait until ClusterIssuer letsencrypt is Ready (east)"
+  ansible.builtin.command:
+    argv:
+      - oc
+      - --context={{ ctx_east }}
+      - wait
+      - clusterissuer/letsencrypt
+      - --for=condition=ready=true
+      - --timeout=600s
+  register: rhcl_clusterissuer_wait_east
+  changed_when: false
+  tags: [step12]
+
+- name: "[12.1] Secret for Kuadrant DNS integration (ingress-gateway, west)"
+  kubernetes.core.k8s:
+    context: "{{ ctx_west }}"
+    state: present
+    apply: true
+    definition:
+      apiVersion: v1
+      kind: Secret
+      metadata:
+        name: aws-credentials
+        namespace: ingress-gateway
+      type: kuadrant.io/aws
+      stringData:
+        AWS_ACCESS_KEY_ID: "{{ lookup('env', 'KUADRANT_AWS_ACCESS_KEY_ID') }}"
+        AWS_SECRET_ACCESS_KEY: "{{ lookup('env', 'KUADRANT_AWS_SECRET_ACCESS_KEY') }}"
+  when: multi_cluster | bool
+  tags: [step12]
+
+- name: "[12.2] Secret for cert-manager (cert-manager, west)"
+  kubernetes.core.k8s:
+    context: "{{ ctx_west }}"
+    state: present
+    apply: true
+    definition:
+      apiVersion: v1
+      kind: Secret
+      metadata:
+        name: aws-credentials
+        namespace: cert-manager
+      type: kuadrant.io/aws
+      stringData:
+        AWS_ACCESS_KEY_ID: "{{ lookup('env', 'KUADRANT_AWS_ACCESS_KEY_ID') }}"
+        AWS_SECRET_ACCESS_KEY: "{{ lookup('env', 'KUADRANT_AWS_SECRET_ACCESS_KEY') }}"
+  when: multi_cluster | bool
+  tags: [step12]
+
+- name: "[12.3] ClusterIssuer letsencrypt (Route53 DNS01, west)"
+  kubernetes.core.k8s:
+    context: "{{ ctx_west }}"
+    state: present
+    apply: true
+    definition: "{{ lookup('file', repo_root ~ '/rhcl/manifests/tls-setup/cluster-issuer.yaml') | replace('${KUADRANT_AWS_DNS_PUBLIC_ZONE_ID}', lookup('env', 'KUADRANT_AWS_DNS_PUBLIC_ZONE_ID')) | from_yaml }}"
+  when: multi_cluster | bool
+  tags: [step12]
+
+- name: "[12.4] Wait until ClusterIssuer letsencrypt is Ready (west)"
+  ansible.builtin.command:
+    argv:
+      - oc
+      - --context={{ ctx_west }}
+      - wait
+      - clusterissuer/letsencrypt
+      - --for=condition=ready=true
+      - --timeout=600s
+  register: rhcl_clusterissuer_wait_west
+  changed_when: false
+  when: multi_cluster | bool
+  tags: [step12]

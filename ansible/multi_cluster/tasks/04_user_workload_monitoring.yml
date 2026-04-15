@@ -15,6 +15,7 @@
     src: "{{ repo_root }}/manifests/monitoring/user-workload-monitoring.yaml"
     state: present
     apply: true
+  when: multi_cluster | bool
   tags: [step4]
 
 - name: "[4.1] Wait for prometheus-user-workload rollout (east)"
@@ -49,4 +50,5 @@
     (west_prom_uwm.resources[0].status.replicas | default(0) | int)
   retries: 36
   delay: 5
+  when: multi_cluster | bool
   tags: [step4]
