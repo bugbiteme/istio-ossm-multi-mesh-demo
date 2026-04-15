@@ -1,0 +1,53 @@
+---
+# Remove Kuadrant TLS/DNS policies, gateway/HTTPRoute-scoped AuthPolicies & RateLimitPolicies,
+# then restore the default Gateway and east Bookinfo HTTPRoute (see rhcl/README.md vs multi_cluster RHCL steps).
+
+- name: "[cleanup] Kuadrant policies to remove (bookinfo → gateway → TLS/DNS)"
+  ansible.builtin.set_fact:
+    rhcl_cleanup_policies:
+      - { kind: RateLimitPolicy, name: bookinfo-rlp, namespace: bookinfo }
+      - { kind: AuthPolicy, name: bookinfo-auth, namespace: bookinfo }
+      - { kind: AuthPolicy, name: allow-all, namespace: bookinfo }
+      - { kind: RateLimitPolicy, name: prod-gateway-rlp, namespace: ingress-gateway }
+      - { kind: AuthPolicy, name: deny-all, namespace: ingress-gateway }
+      - { kind: TLSPolicy, name: prod-gateway-tls, namespace: ingress-gateway }
+      - { kind: DNSPolicy, name: prod-gateway-dnspolicy, namespace: ingress-gateway }
+  tags: [cleanup]
+
+- name: "[cleanup] Remove Kuadrant policies (east)"
+  kubernetes.core.k8s:
+    context: "{{ ctx_east }}"
+    state: absent
+    api_version: kuadrant.io/v1
+    kind: "{{ item.kind }}"
+    name: "{{ item.name }}"
+    namespace: "{{ item.namespace }}"
+  loop: "{{ rhcl_cleanup_policies }}"
+  loop_control:
+    label: "{{ item.namespace }}/{{ item.kind }}/{{ item.name }}"
+  tags: [cleanup]
+
+- name: "[cleanup] Restore default Gateway (east)"
+  kubernetes.core.k8s:
+    context: "{{ ctx_east }}"
+    definition: "{{ lookup('file', repo_root ~ '/manifests/ingress-gateway/gateway.yaml') | from_yaml_all | list }}"
+    state: present
+    apply: true
+  tags: [cleanup]
+
+- name: "[cleanup] Restore default Bookinfo HTTPRoute from east manifest (east)"
+  kubernetes.core.k8s:
+    context: "{{ ctx_east }}"
+    definition: "{{ lookup('file', repo_root ~ '/manifests/bookinfo/app/east/productpage-httproute.yaml') | from_yaml }}"
+    state: present
+    apply: true
+  tags: [cleanup]
+
+- name: "[cleanup] Restore default Bookinfo HTTPRoute from east manifest (west)"
+  kubernetes.core.k8s:
+    context: "{{ ctx_west }}"
+    definition: "{{ lookup('file', repo_root ~ '/manifests/bookinfo/app/east/productpage-httproute.yaml') | from_yaml }}"
+    state: present
+    apply: true
+  when: multi_cluster | bool
+  tags: [cleanup]

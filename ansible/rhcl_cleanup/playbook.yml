@@ -1,0 +1,30 @@
+---
+# RHCL / Kuadrant cleanup – multi-cluster demo
+#
+# Reverts RHCL-oriented Gateway + Bookinfo HTTPRoute and removes Kuadrant policies created for
+# prod-gateway and the bookinfo HTTPRoute (TLS/DNS policies, AuthPolicies, RateLimitPolicies).
+#
+# Usage (from this directory, or pass the path to ansible-playbook):
+#   ansible-playbook playbook.yml
+#   ansible-playbook playbook.yml -e multi_cluster=true
+#   ansible-playbook playbook.yml --tags cleanup
+# From repository root:
+#   ansible-playbook ansible/rhcl_cleanup/playbook.yml
+#
+# Requires: ansible collections kubernetes.core; kubeconfig contexts from ansible/multi_cluster/vars/main.yml
+# (ctx_east / ctx_west). Set multi_cluster=true to run the same cleanup on the west context.
+
+- name: RHCL / Kuadrant cleanup – restore gateway + Bookinfo HTTPRoute
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars_files:
+    - ../multi_cluster/vars/main.yml
+  vars:
+    # ansible/rhcl_cleanup/ → repository root (two levels up)
+    repo_root: "{{ (playbook_dir ~ '/../..') | realpath }}"
+
+  tasks:
+    - name: Import RHCL cleanup tasks
+      ansible.builtin.import_tasks: tasks/cleanup.yml
+      tags: [cleanup]

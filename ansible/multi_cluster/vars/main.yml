@@ -23,7 +23,7 @@ istio_version: "1.27.5"
 multi_cluster: false
 
 # Set to true to enable RHCL deployment, false to skip
-rhcl_enabled: true
+rhcl_enabled: false
 
 # Set to true to enable minimal Istio deployment for RHCL, false to use full Istio control plane
 rhcl_minimal_istio: false
