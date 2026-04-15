@@ -1,8 +1,8 @@
 export KUADRANT_GATEWAY_NS=ingress-gateway
 export KUADRANT_GATEWAY_NAME=prod-gateway
 export KUADRANT_DEVELOPER_NS=bookinfo 
-export KUADRANT_AWS_ACCESS_KEY_ID=3
-export KUADRANT_AWS_SECRET_ACCESS_KEY=
-export KUADRANT_AWS_DNS_PUBLIC_ZONE_ID=
-export KUADRANT_ZONE_ROOT_DOMAIN=demo.leonlevy.lol
+export KUADRANT_AWS_ACCESS_KEY_ID=<your-access-key-id>
+export KUADRANT_AWS_SECRET_ACCESS_KEY=<your-secret-access-key>
+export KUADRANT_AWS_DNS_PUBLIC_ZONE_ID=<your-hosted-zone-id>
+export KUADRANT_ZONE_ROOT_DOMAIN=demo.leonlevy.lol #update to your root domain
 export KUADRANT_CLUSTER_ISSUER_NAME=self-signed
