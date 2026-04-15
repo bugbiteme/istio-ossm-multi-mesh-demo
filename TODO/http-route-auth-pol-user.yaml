@@ -1,0 +1,42 @@
+apiVersion: kuadrant.io/v1
+kind: AuthPolicy
+metadata:
+  name: bookinfo-auth
+  namespace: bookinfo
+spec:
+  targetRef:
+    group: gateway.networking.k8s.io
+    kind: HTTPRoute
+    name: bookinfo
+  defaults:
+    when:
+      - predicate: "request.path.startsWith('/api/v1/products')"
+    rules:
+      authentication:
+        "api-key-users":
+          apiKey:
+            selector:
+              matchLabels:
+                app: bookinfo
+          credentials:
+            authorizationHeader:
+              prefix: APIKEY
+          response:
+            unauthorized:
+              body:
+                value: |
+                  {
+                    "error": "Forbidden",
+                    "message": "Access denied by default by the application owner. If you are the administrator of the service, create a specific auth policy for the route."
+                  }
+              headers:
+                content-type:
+                  value: application/json
+      response:
+        success:
+          filters:
+            "identity":
+              json:
+                properties:
+                  "userid":
+                    selector: auth.identity.metadata.annotations.secret\.kuadrant\.io/user-id
