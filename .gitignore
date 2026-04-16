@@ -14,10 +14,12 @@ ansible/multi_cluster/env.sh
 
 *.pem
 
-env.sh
+# Local overrides (never commit secrets); copy from env.sh.example
+rhcl/env.sh
 
 # Terraform
 .terraform/
+.terraform.lock.hcl
 *.tfstate
 *.tfstate.*
 .terraform.tfstate.lock.info

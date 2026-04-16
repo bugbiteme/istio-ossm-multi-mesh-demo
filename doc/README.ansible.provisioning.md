@@ -104,7 +104,7 @@ cd ansible/cluster
 # All steps, default vars (single cluster, no RHCL)
 ansible-playbook site.yml
 
-# Single cluster with RHCL (assumes you set the env variables in ../rhcl/env.sh)
+# Single cluster with RHCL (assumes ../rhcl/env.sh from rhcl/env.sh.example)
 ansible-playbook site.yml -e rhcl_enabled=true
 
 # Multi-cluster OSSM without RHCL (run again later with rhcl_enabled to add RHCL on admin-east)

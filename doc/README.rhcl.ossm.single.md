@@ -5,9 +5,11 @@
 
 ## 1. Environment and cluster context
 
-1. Load the environment variables:
+1. Create your local env file once (not tracked by git), then load it:
 
    ```bash
+   cp rhcl/env.sh.example rhcl/env.sh
+   # edit rhcl/env.sh with your AWS and DNS values
    source rhcl/env.sh
    ```
 
