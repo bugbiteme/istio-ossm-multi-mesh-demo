@@ -46,7 +46,7 @@ For Red Hatters, most testing used **AWS with OpenShift Open Environment** in RH
   - **Values:** the four nameservers from the `demo.leonlevy.lol` hosted zone.
   - **Routing policy:** Simple.
 
-The above may be automated at a later time.
+Example terraform scripts to do this are available in the `terraform/` directory
 
 **Note:** The examples use a specific domain; use your own domain if you want to demonstrate `TLSPolicy` and `DNSPolicy` with RHCL.
 
