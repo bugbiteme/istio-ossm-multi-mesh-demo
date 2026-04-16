@@ -1,7 +1,7 @@
-# Single-Cluster Demo – Step-by-Step Instructions
+# Single-cluster OSSM demo — step-by-step
 
 ---
-**Note**: Instructions to automate the following steps can be found in `ansible/README.md`
+**Note:** To automate these steps, see [README.ansible.provisioning.md](README.ansible.provisioning.md).
 
 ## 1. Rename context
 
@@ -108,7 +108,7 @@ oc --context="${CTX_EAST}" get pods -n openshift-user-workload-monitoring
 
 This step runs **once**. The root CA key should be stored in a secrets manager (Vault, AWS Secrets Manager, etc.) after use. Only the cert is distributed to the cluster.
 
-The OpenSSL config is in [`certs/root-ca.conf`](certs/root-ca.conf). Run from the repo root:
+The OpenSSL config is in [`certs/root-ca.conf`](../certs/root-ca.conf). Run from the repo root:
 
 ```bash
 cd certs
@@ -122,7 +122,7 @@ cd ..
 
 ### 5.1 Load the root CA into cert-manager
 
-The root CA is loaded as a `ClusterIssuer` using [`manifests/cert-manager/clusterissuer.yaml`](manifests/cert-manager/clusterissuer.yaml):
+The root CA is loaded as a `ClusterIssuer` using [`manifests/cert-manager/clusterissuer.yaml`](../manifests/cert-manager/clusterissuer.yaml):
 
 ```bash
 oc --context="${CTX_EAST}" create namespace istio-system --dry-run=client -o yaml | \

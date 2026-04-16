@@ -11,14 +11,14 @@
     apply: true
   tags: [step13]
 
-- name: "[13.1] Apply Kuadrant Gateway manifests (west)"
-  kubernetes.core.k8s:
-    context: "{{ ctx_west }}"
-    definition: "{{ lookup('file', repo_root ~ '/manifests/ingress-gateway/rhcl/gateway.yaml') | from_yaml_all | list }}"
-    state: present
-    apply: true
-  when: multi_cluster | bool
-  tags: [step13]
+# - name: "[13.1] Apply Kuadrant Gateway manifests (west)"
+#   kubernetes.core.k8s:
+#     context: "{{ ctx_west }}"
+#     definition: "{{ lookup('file', repo_root ~ '/manifests/ingress-gateway/rhcl/gateway.yaml') | from_yaml_all | list }}"
+#     state: present
+#     apply: true
+#   when: multi_cluster | bool
+#   tags: [step13]
 
 - name: "[13.2] Wait for Gateway Accepted and Programmed (east)"
   kubernetes.core.k8s_info:
@@ -58,44 +58,44 @@
     )
   tags: [step13]
 
-- name: "[13.2] Wait for Gateway Accepted and Programmed (west)"
-  kubernetes.core.k8s_info:
-    context: "{{ ctx_west }}"
-    api_version: gateway.networking.k8s.io/v1
-    kind: Gateway
-    name: prod-gateway
-    namespace: ingress-gateway
-  register: rhcl_gw_west
-  until: >
-    rhcl_gw_west.resources | length > 0 and
-    (
-      rhcl_gw_west.resources[0].status.conditions | default([])
-      | selectattr('type', 'equalto', 'Accepted')
-      | map(attribute='status')
-      | first | default('')
-      == 'True'
-    ) and
-    (
-      rhcl_gw_west.resources[0].status.conditions | default([])
-      | selectattr('type', 'equalto', 'Programmed')
-      | map(attribute='status')
-      | first | default('')
-      == 'True'
-    )
-  retries: 60
-  delay: 10
-  failed_when: >
-    rhcl_gw_west.resources | length > 0 and
-    (
-      (
-        rhcl_gw_west.resources[0].status.conditions | default([])
-        | selectattr('type', 'equalto', 'Accepted')
-        | map(attribute='status')
-        | first | default('')
-      ) == 'False'
-    )
-  when: multi_cluster | bool
-  tags: [step13]
+# - name: "[13.2] Wait for Gateway Accepted and Programmed (west)"
+#   kubernetes.core.k8s_info:
+#     context: "{{ ctx_west }}"
+#     api_version: gateway.networking.k8s.io/v1
+#     kind: Gateway
+#     name: prod-gateway
+#     namespace: ingress-gateway
+#   register: rhcl_gw_west
+#   until: >
+#     rhcl_gw_west.resources | length > 0 and
+#     (
+#       rhcl_gw_west.resources[0].status.conditions | default([])
+#       | selectattr('type', 'equalto', 'Accepted')
+#       | map(attribute='status')
+#       | first | default('')
+#       == 'True'
+#     ) and
+#     (
+#       rhcl_gw_west.resources[0].status.conditions | default([])
+#       | selectattr('type', 'equalto', 'Programmed')
+#       | map(attribute='status')
+#       | first | default('')
+#       == 'True'
+#     )
+#   retries: 60
+#   delay: 10
+#   failed_when: >
+#     rhcl_gw_west.resources | length > 0 and
+#     (
+#       (
+#         rhcl_gw_west.resources[0].status.conditions | default([])
+#         | selectattr('type', 'equalto', 'Accepted')
+#         | map(attribute='status')
+#         | first | default('')
+#       ) == 'False'
+#     )
+#   when: multi_cluster | bool
+#   tags: [step13]
 
 # README §5.6 — Accepted / Programmed messages (cluster Gateway status)
 - name: "[13.3] Gateway Accepted / Programmed messages (east)"
@@ -111,19 +111,19 @@
         | map(attribute='message') | first | default('(none)') }}
   tags: [step13]
 
-- name: "[13.3] Gateway Accepted / Programmed messages (west)"
-  ansible.builtin.debug:
-    msg:
-      accepted: >-
-        {{ rhcl_gw_west.resources[0].status.conditions | default([])
-        | selectattr('type', 'equalto', 'Accepted')
-        | map(attribute='message') | first | default('(none)') }}
-      programmed: >-
-        {{ rhcl_gw_west.resources[0].status.conditions | default([])
-        | selectattr('type', 'equalto', 'Programmed')
-        | map(attribute='message') | first | default('(none)') }}
-  when: multi_cluster | bool
-  tags: [step13]
+# - name: "[13.3] Gateway Accepted / Programmed messages (west)"
+#   ansible.builtin.debug:
+#     msg:
+#       accepted: >-
+#         {{ rhcl_gw_west.resources[0].status.conditions | default([])
+#         | selectattr('type', 'equalto', 'Accepted')
+#         | map(attribute='message') | first | default('(none)') }}
+#       programmed: >-
+#         {{ rhcl_gw_west.resources[0].status.conditions | default([])
+#         | selectattr('type', 'equalto', 'Programmed')
+#         | map(attribute='message') | first | default('(none)') }}
+#   when: multi_cluster | bool
+#   tags: [step13]
 
 # README §5.7 — HTTPS listener may show Bad TLS until TLSPolicy + cert-manager populate the secret
 - name: "[13.4] HTTPS listener Programmed message (east)"
@@ -165,43 +165,43 @@
         the TLSPolicy; cert-manager creates api-prod-gateway-tls after that.
   tags: [step13]
 
-- name: "[13.4] HTTPS listener Programmed message (west)"
-  vars:
-    rhcl_gw_name: "{{ lookup('env', 'KUADRANT_GATEWAY_NAME') | default('prod-gateway', true) }}"
-    rhcl_gw_ns: "{{ lookup('env', 'KUADRANT_GATEWAY_NS') | default('ingress-gateway', true) }}"
-  kubernetes.core.k8s_info:
-    context: "{{ ctx_west }}"
-    api_version: gateway.networking.k8s.io/v1
-    kind: Gateway
-    name: "{{ rhcl_gw_name }}"
-    namespace: "{{ rhcl_gw_ns }}"
-  register: rhcl_gw_listener_west
-  when: multi_cluster | bool
-  tags: [step13]
+# - name: "[13.4] HTTPS listener Programmed message (west)"
+#   vars:
+#     rhcl_gw_name: "{{ lookup('env', 'KUADRANT_GATEWAY_NAME') | default('prod-gateway', true) }}"
+#     rhcl_gw_ns: "{{ lookup('env', 'KUADRANT_GATEWAY_NS') | default('ingress-gateway', true) }}"
+#   kubernetes.core.k8s_info:
+#     context: "{{ ctx_west }}"
+#     api_version: gateway.networking.k8s.io/v1
+#     kind: Gateway
+#     name: "{{ rhcl_gw_name }}"
+#     namespace: "{{ rhcl_gw_ns }}"
+#   register: rhcl_gw_listener_west
+#   when: multi_cluster | bool
+#   tags: [step13]
 
-- name: "[13.4] Note listener TLS status (west)"
-  ansible.builtin.debug:
-    msg:
-      listener_programmed_message: >-
-        {{
-          (
-            (
-              (
-                (rhcl_gw_listener_west.resources[0].status | default({})).listeners | default([])
-                | first
-              ).conditions | default([])
-              | selectattr('type', 'equalto', 'Programmed')
-              | map(attribute='message') | first | default('(none)')
-            )
-            if (
-              (rhcl_gw_listener_west.resources[0].status | default({})).listeners | default([])
-              | length
-            ) > 0
-            else '(no listeners in Gateway status yet)'
-          )
-        }}
-      note: >-
-        If this mentions bad TLS configuration, that is expected until you apply
-        the TLSPolicy; cert-manager creates api-prod-gateway-tls after that.
-  when: multi_cluster | bool
-  tags: [step13]
+# - name: "[13.4] Note listener TLS status (west)"
+#   ansible.builtin.debug:
+#     msg:
+#       listener_programmed_message: >-
+#         {{
+#           (
+#             (
+#               (
+#                 (rhcl_gw_listener_west.resources[0].status | default({})).listeners | default([])
+#                 | first
+#               ).conditions | default([])
+#               | selectattr('type', 'equalto', 'Programmed')
+#               | map(attribute='message') | first | default('(none)')
+#             )
+#             if (
+#               (rhcl_gw_listener_west.resources[0].status | default({})).listeners | default([])
+#               | length
+#             ) > 0
+#             else '(no listeners in Gateway status yet)'
+#           )
+#         }}
+#       note: >-
+#         If this mentions bad TLS configuration, that is expected until you apply
+#         the TLSPolicy; cert-manager creates api-prod-gateway-tls after that.
+#   when: multi_cluster | bool
+#   tags: [step13]

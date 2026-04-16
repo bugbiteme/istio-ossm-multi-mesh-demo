@@ -69,61 +69,61 @@
   changed_when: false
   tags: [step12]
 
-- name: "[12.1] Secret for Kuadrant DNS integration (ingress-gateway, west)"
-  kubernetes.core.k8s:
-    context: "{{ ctx_west }}"
-    state: present
-    apply: true
-    definition:
-      apiVersion: v1
-      kind: Secret
-      metadata:
-        name: aws-credentials
-        namespace: ingress-gateway
-      type: kuadrant.io/aws
-      stringData:
-        AWS_ACCESS_KEY_ID: "{{ lookup('env', 'KUADRANT_AWS_ACCESS_KEY_ID') }}"
-        AWS_SECRET_ACCESS_KEY: "{{ lookup('env', 'KUADRANT_AWS_SECRET_ACCESS_KEY') }}"
-  when: multi_cluster | bool
-  tags: [step12]
+# - name: "[12.1] Secret for Kuadrant DNS integration (ingress-gateway, west)"
+#   kubernetes.core.k8s:
+#     context: "{{ ctx_west }}"
+#     state: present
+#     apply: true
+#     definition:
+#       apiVersion: v1
+#       kind: Secret
+#       metadata:
+#         name: aws-credentials
+#         namespace: ingress-gateway
+#       type: kuadrant.io/aws
+#       stringData:
+#         AWS_ACCESS_KEY_ID: "{{ lookup('env', 'KUADRANT_AWS_ACCESS_KEY_ID') }}"
+#         AWS_SECRET_ACCESS_KEY: "{{ lookup('env', 'KUADRANT_AWS_SECRET_ACCESS_KEY') }}"
+#   when: multi_cluster | bool
+#   tags: [step12]
 
-- name: "[12.2] Secret for cert-manager (cert-manager, west)"
-  kubernetes.core.k8s:
-    context: "{{ ctx_west }}"
-    state: present
-    apply: true
-    definition:
-      apiVersion: v1
-      kind: Secret
-      metadata:
-        name: aws-credentials
-        namespace: cert-manager
-      type: kuadrant.io/aws
-      stringData:
-        AWS_ACCESS_KEY_ID: "{{ lookup('env', 'KUADRANT_AWS_ACCESS_KEY_ID') }}"
-        AWS_SECRET_ACCESS_KEY: "{{ lookup('env', 'KUADRANT_AWS_SECRET_ACCESS_KEY') }}"
-  when: multi_cluster | bool
-  tags: [step12]
+# - name: "[12.2] Secret for cert-manager (cert-manager, west)"
+#   kubernetes.core.k8s:
+#     context: "{{ ctx_west }}"
+#     state: present
+#     apply: true
+#     definition:
+#       apiVersion: v1
+#       kind: Secret
+#       metadata:
+#         name: aws-credentials
+#         namespace: cert-manager
+#       type: kuadrant.io/aws
+#       stringData:
+#         AWS_ACCESS_KEY_ID: "{{ lookup('env', 'KUADRANT_AWS_ACCESS_KEY_ID') }}"
+#         AWS_SECRET_ACCESS_KEY: "{{ lookup('env', 'KUADRANT_AWS_SECRET_ACCESS_KEY') }}"
+#   when: multi_cluster | bool
+#   tags: [step12]
 
-- name: "[12.3] ClusterIssuer letsencrypt (Route53 DNS01, west)"
-  kubernetes.core.k8s:
-    context: "{{ ctx_west }}"
-    state: present
-    apply: true
-    definition: "{{ lookup('file', repo_root ~ '/rhcl/manifests/tls-setup/cluster-issuer.yaml') | replace('${KUADRANT_AWS_DNS_PUBLIC_ZONE_ID}', lookup('env', 'KUADRANT_AWS_DNS_PUBLIC_ZONE_ID')) | from_yaml }}"
-  when: multi_cluster | bool
-  tags: [step12]
+# - name: "[12.3] ClusterIssuer letsencrypt (Route53 DNS01, west)"
+#   kubernetes.core.k8s:
+#     context: "{{ ctx_west }}"
+#     state: present
+#     apply: true
+#     definition: "{{ lookup('file', repo_root ~ '/rhcl/manifests/tls-setup/cluster-issuer.yaml') | replace('${KUADRANT_AWS_DNS_PUBLIC_ZONE_ID}', lookup('env', 'KUADRANT_AWS_DNS_PUBLIC_ZONE_ID')) | from_yaml }}"
+#   when: multi_cluster | bool
+#   tags: [step12]
 
-- name: "[12.4] Wait until ClusterIssuer letsencrypt is Ready (west)"
-  ansible.builtin.command:
-    argv:
-      - oc
-      - --context={{ ctx_west }}
-      - wait
-      - clusterissuer/letsencrypt
-      - --for=condition=ready=true
-      - --timeout=600s
-  register: rhcl_clusterissuer_wait_west
-  changed_when: false
-  when: multi_cluster | bool
-  tags: [step12]
+# - name: "[12.4] Wait until ClusterIssuer letsencrypt is Ready (west)"
+#   ansible.builtin.command:
+#     argv:
+#       - oc
+#       - --context={{ ctx_west }}
+#       - wait
+#       - clusterissuer/letsencrypt
+#       - --for=condition=ready=true
+#       - --timeout=600s
+#   register: rhcl_clusterissuer_wait_west
+#   changed_when: false
+#   when: multi_cluster | bool
+#   tags: [step12]

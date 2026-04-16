@@ -9,11 +9,11 @@
     apply: true
   tags: [step16]
 
-- name: "[16.1] Apply Bookinfo HTTPRoute for RHCL (west)"
-  kubernetes.core.k8s:
-    context: "{{ ctx_west }}"
-    definition: "{{ lookup('file', repo_root ~ '/manifests/bookinfo/app/rhcl/productpage-httproute-rhcl.yaml') | from_yaml }}"
-    state: present
-    apply: true
-  when: multi_cluster | bool
-  tags: [step16]
+# - name: "[16.1] Apply Bookinfo HTTPRoute for RHCL (west)"
+#   kubernetes.core.k8s:
+#     context: "{{ ctx_west }}"
+#     definition: "{{ lookup('file', repo_root ~ '/manifests/bookinfo/app/rhcl/productpage-httproute-rhcl.yaml') | from_yaml }}"
+#     state: present
+#     apply: true
+#   when: multi_cluster | bool
+#   tags: [step16]

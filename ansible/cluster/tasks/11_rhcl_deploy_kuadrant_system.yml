@@ -30,17 +30,17 @@
     label: "{{ item.path | basename }}"
   tags: [step11]
 
-- name: "[11.1] Apply Kuadrant system manifests (west)"
-  kubernetes.core.k8s:
-    context: "{{ ctx_west }}"
-    definition: "{{ lookup('file', item.path) | from_yaml_all | list }}"
-    state: present
-    apply: true
-  loop: "{{ kuadrant_system_manifests.files }}"
-  loop_control:
-    label: "{{ item.path | basename }}"
-  when: multi_cluster | bool
-  tags: [step11]
+# - name: "[11.1] Apply Kuadrant system manifests (west)"
+#   kubernetes.core.k8s:
+#     context: "{{ ctx_west }}"
+#     definition: "{{ lookup('file', item.path) | from_yaml_all | list }}"
+#     state: present
+#     apply: true
+#   loop: "{{ kuadrant_system_manifests.files }}"
+#   loop_control:
+#     label: "{{ item.path | basename }}"
+#   when: multi_cluster | bool
+#   tags: [step11]
 
 # Rollouts first (same idea as tracing-system); then confirm every pod is Running with all containers ready.
 - name: "[11.2] Wait for kuadrant-system rollouts (east)"
@@ -58,21 +58,21 @@
   changed_when: false
   tags: [step11]
 
-- name: "[11.2] Wait for kuadrant-system rollouts (west)"
-  ansible.builtin.shell: |
-    set -euo pipefail
-    ctx="{{ ctx_west }}"
-    ns=kuadrant-system
-    for kind in deploy sts ds; do
-      oc --context="$ctx" get "$kind" -n "$ns" -o name 2>/dev/null | while read -r res; do
-        oc --context="$ctx" rollout status "$res" -n "$ns" --timeout=600s
-      done
-    done
-  args:
-    executable: /bin/bash
-  changed_when: false
-  when: multi_cluster | bool
-  tags: [step11]
+# - name: "[11.2] Wait for kuadrant-system rollouts (west)"
+#   ansible.builtin.shell: |
+#     set -euo pipefail
+#     ctx="{{ ctx_west }}"
+#     ns=kuadrant-system
+#     for kind in deploy sts ds; do
+#       oc --context="$ctx" get "$kind" -n "$ns" -o name 2>/dev/null | while read -r res; do
+#         oc --context="$ctx" rollout status "$res" -n "$ns" --timeout=600s
+#       done
+#     done
+#   args:
+#     executable: /bin/bash
+#   changed_when: false
+#   when: multi_cluster | bool
+#   tags: [step11]
 
 - name: "[11.3] Wait for all kuadrant-system pods Running and ready (east)"
   kubernetes.core.k8s_info:
