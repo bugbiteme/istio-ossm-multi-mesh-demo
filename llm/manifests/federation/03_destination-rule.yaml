@@ -1,0 +1,11 @@
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: maas-external-tls
+  namespace: llm
+spec:
+  host: litellm-prod.apps.maas.redhatworkshops.io
+  trafficPolicy:
+    tls:
+      mode: SIMPLE
+      insecureSkipVerify: true
