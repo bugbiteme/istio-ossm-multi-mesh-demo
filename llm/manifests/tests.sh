@@ -8,7 +8,8 @@ curl -X POST https://llm.demo.leonlevy.lol/v1/chat/completions \
   -d '{
     "model": "deepseek-r1-distill-qwen-14b",
     "messages": [{"role": "user", "content": "What is the capital of California?"}],
-    "max_tokens": 50
+    "max_tokens": 50,
+    "temperature": 0.2
   }'
 echo
 echo
