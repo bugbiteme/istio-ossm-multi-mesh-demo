@@ -36,3 +36,4 @@ curl -X POST https://llm.demo.leonlevy.lol/v1/chat/completions \
     "messages": [{"role": "user", "content": "What is istio service mesh?"}],
     "max_tokens": 50
   }'
+
