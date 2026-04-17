@@ -52,7 +52,7 @@ curl -X POST https://litellm-prod.apps.maas.redhatworkshops.io/v1/chat/completio
     "stream": false
   }'
 
-   kubectl run curl-test --image=curlimages/curl --rm -it --restart=Never -n llm \
+  kubectl run curl-test --image=curlimages/curl --rm -it --restart=Never -n llm \
   --env="LLM_API_KEY=${LLM_API_KEY}" \
   -- curl -k -X POST https://maas-backend.llm.svc.cluster.local/v1/chat/completions \
   -H "Host: litellm-prod.apps.maas.redhatworkshops.io" \
@@ -64,3 +64,17 @@ curl -X POST https://litellm-prod.apps.maas.redhatworkshops.io/v1/chat/completio
     "stream": false
   }'
 
+
+kubectl -n llm exec $(kubectl -n llm get pod -l app=vllm -o name) \
+-- curl -H 'Content-Type: application/json' \
+     -X POST localhost:8000/v1/chat/completions \
+     -w '\nHTTP code: %{http_code}\n' \
+     -d '{
+           "model": "meta-llama/Llama-3.1-8B-Instruct",
+           "messages": [
+             { "role": "user", "content": "What is Kubernetes?" }
+           ],
+           "max_tokens": 100,
+           "stream": false,
+           "usage": true
+         }' && echo

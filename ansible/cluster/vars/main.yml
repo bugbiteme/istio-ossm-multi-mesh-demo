@@ -25,6 +25,9 @@ multi_cluster: false
 # Set to true to enable RHCL deployment, false to skip
 rhcl_enabled: false
 
+# Set to true to deploy LLM access with RHCL, false to omit (rhcl_enabled must be set to true as well)
+rhcl_secure_llm: false
+
 # Set to true to enable minimal Istio deployment for RHCL, false to use full Istio control plane
 rhcl_minimal_istio: false
 

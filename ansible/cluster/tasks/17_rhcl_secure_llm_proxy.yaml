@@ -1,0 +1,80 @@
+---
+# Step 17: Secure LLM proxy via RHCL (llm/README.md)
+
+- name: "[17.0] Require LLM_API_KEY for upstream bearer token secret"
+  ansible.builtin.assert:
+    that:
+      - (lookup('env', 'LLM_API_KEY') | default('', true)) | length > 0
+    fail_msg: >-
+      Set LLM_API_KEY in the environment when using rhcl_secure_llm=true
+      (see llm/README.md — Create Secret with API Bearer Token).
+  tags: [step17]
+
+- name: "[17.1] Apply llm namespace"
+  kubernetes.core.k8s:
+    context: "{{ ctx_east }}"
+    definition: "{{ lookup('file', repo_root ~ '/llm/manifests/federation/01_namespace.yaml') | from_yaml }}"
+    state: present
+    apply: true
+  tags: [step17]
+
+- name: "[17.2] Apply ServiceEntry for external MaaS host"
+  kubernetes.core.k8s:
+    context: "{{ ctx_east }}"
+    definition: "{{ lookup('file', repo_root ~ '/llm/manifests/federation/02_service-entry.yaml') | from_yaml }}"
+    state: present
+    apply: true
+  tags: [step17]
+
+- name: "[17.3] Apply DestinationRule (TLS to external host)"
+  kubernetes.core.k8s:
+    context: "{{ ctx_east }}"
+    definition: "{{ lookup('file', repo_root ~ '/llm/manifests/federation/03_destination-rule.yaml') | from_yaml }}"
+    state: present
+    apply: true
+  tags: [step17]
+
+- name: "[17.4] Apply ExternalName Service (maas-backend)"
+  kubernetes.core.k8s:
+    context: "{{ ctx_east }}"
+    definition: "{{ lookup('file', repo_root ~ '/llm/manifests/federation/04_service.yaml') | from_yaml }}"
+    state: present
+    apply: true
+  tags: [step17]
+
+- name: "[17.5] Apply API key Secret (LLM_API_KEY substituted)"
+  kubernetes.core.k8s:
+    context: "{{ ctx_east }}"
+    definition: >-
+      {{
+        lookup('file', repo_root ~ '/llm/manifests/federation/07_secret.yaml')
+        | replace('${LLM_API_KEY}', lookup('env', 'LLM_API_KEY'))
+        | from_yaml
+      }}
+    state: present
+    apply: true
+  tags: [step17]
+
+- name: "[17.6] Apply HTTPRoute (maas-route)"
+  kubernetes.core.k8s:
+    context: "{{ ctx_east }}"
+    definition: "{{ lookup('file', repo_root ~ '/llm/manifests/federation/06_http-route.yaml') | from_yaml }}"
+    state: present
+    apply: true
+  tags: [step17]
+
+- name: "[17.7] Apply AuthPolicy for HTTPRoute"
+  kubernetes.core.k8s:
+    context: "{{ ctx_east }}"
+    definition: "{{ lookup('file', repo_root ~ '/llm/manifests/federation/08_auth-policy.yaml') | from_yaml }}"
+    state: present
+    apply: true
+  tags: [step17]
+
+- name: "[17.8] Apply Mock LLM (vllm)"
+  kubernetes.core.k8s:
+    context: "{{ ctx_east }}"
+    definition: "{{ lookup('file', repo_root ~ '/llm/manifests/federation/09_mock_llm.yaml') | from_yaml }}"
+    state: present
+    apply: true
+  tags: [step17]

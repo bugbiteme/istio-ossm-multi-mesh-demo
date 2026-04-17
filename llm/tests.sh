@@ -36,4 +36,16 @@ curl -X POST https://llm.demo.leonlevy.lol/v1/chat/completions \
     "messages": [{"role": "user", "content": "What is istio service mesh?"}],
     "max_tokens": 50
   }'
+echo
+echo
+echo "--------------------------------"
+echo "Testing with mock LLM"
+echo "--------------------------------"
+curl -X POST https://llm.demo.leonlevy.lol/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "vllm",
+    "messages": [{"role": "user", "content": "What is istio service mesh?"}],
+    "max_tokens": 50
+  }'
 

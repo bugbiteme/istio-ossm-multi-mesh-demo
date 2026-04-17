@@ -36,7 +36,7 @@ For Red Hatters, most testing used **AWS with OpenShift Open Environment** in RH
 - Provision two OpenShift clusters with the configuration above.
 - The demo works whether the clusters are in the same region or different regions.
 
-### RHCL prerequisites 
+## RHCL prerequisites 
 
 - A domain registered with AWS Route 53 (this repo uses `leonlevy.lol` as an example).
 - A subdomain public hosted zone (for example `demo.leonlevy.lol`).
@@ -46,13 +46,13 @@ For Red Hatters, most testing used **AWS with OpenShift Open Environment** in RH
   - **Values:** the four nameservers from the `demo.leonlevy.lol` hosted zone.
   - **Routing policy:** Simple.
 
-Example terraform scripts to do this are available in the `terraform/` directory
+Example terraform scripts to automate this are available in the `terraform/` directory
 
 **Note:** The examples use a specific domain; use your own domain if you want to demonstrate `TLSPolicy` and `DNSPolicy` with RHCL.
 
 ## Demo applications
 
-The environment primarily uses the **bookinfo** sample. A small LLM demo for gateway policies may be added later, along with MCP-oriented examples.
+The environment primarily uses the **bookinfo** sample. An LLM demo for gateway policies is available, proxying RHDP MaaS. Future releases will include with MCP-oriented examples.
 
 ## Documentation
 

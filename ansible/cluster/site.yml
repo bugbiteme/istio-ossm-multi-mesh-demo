@@ -6,7 +6,7 @@
 #   ansible-playbook site.yml --tags step5        # run a single step
 #   ansible-playbook site.yml --skip-tags step2   # skip istioctl install (Dev Spaces)
 #
-# Available tags: preflight step1 step2 step3…step16 (no separate “verify” step; see preflight)
+# Available tags: preflight step1 step2 step3…step17 (no separate “verify” step; see preflight)
 #   preflight = API checks for contexts that already exist in kubeconfig
 #   step1 = require admin-east / admin-west in kubeconfig (README §1.1–1.2) + optional console banners
 
@@ -135,3 +135,8 @@
       ansible.builtin.import_tasks: tasks/16_rhcl_update_bookinfo_httproute.yml
       when: rhcl_enabled | bool
       tags: [step16]
+
+    - name: "Step 17 | Secure LLM proxy (Istio federation + Kuadrant secret/HTTPRoute/AuthPolicy)"
+      ansible.builtin.import_tasks: tasks/17_rhcl_secure_llm_proxy.yaml
+      when: rhcl_enabled | bool and rhcl_secure_llm | bool
+      tags: [step17]
