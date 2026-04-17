@@ -1,5 +1,5 @@
 curl -X POST https://litellm-prod.apps.maas.redhatworkshops.io/v1/chat/completions \
-  -H "Authorization: Bearer sk-2Oq_nZ480uqgu7N1obJK9Q" \
+  -H "Authorization: Bearer ${LLM_API_KEY}" \
   -H "Content-Type: application/json" \
   -d '{
     "model": "deepseek-r1-distill-qwen-14b",
@@ -10,7 +10,7 @@ curl -X POST https://litellm-prod.apps.maas.redhatworkshops.io/v1/chat/completio
 
 
 curl -X POST https://litellm-prod.apps.maas.redhatworkshops.io/v1/chat/completions \
-  -H "Authorization: Bearer sk-2Oq_nZ480uqgu7N1obJK9Q" \
+  -H "Authorization: Bearer ${LLM_API_KEY}" \
   -H "Content-Type: application/json" \
   -d '{
     "model": "deepseek-r1-distill-qwen-14b",
@@ -19,7 +19,7 @@ curl -X POST https://litellm-prod.apps.maas.redhatworkshops.io/v1/chat/completio
   }'
 
   curl -X POST https://litellm-prod.apps.maas.redhatworkshops.io/v1/chat/completions \
-  -H "Authorization: Bearer sk-2Oq_nZ480uqgu7N1obJK9Q" \
+  -H "Authorization: Bearer ${LLM_API_KEY}" \
   -H "Content-Type: application/json" \
   -d '{
     "model": "deepseek-r1-distill-qwen-14b",
