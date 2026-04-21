@@ -78,3 +78,12 @@
     state: present
     apply: true
   tags: [step17]
+
+- name: "[17.9] Apply LLM Users (free and gold)"
+  kubernetes.core.k8s:
+    context: "{{ ctx_east }}"
+    definition: "{{ item }}"
+    state: present
+    apply: true
+  loop: "{{ lookup('file', repo_root ~ '/llm/manifests/federation/05_llm-users.yaml') | from_yaml_all | list }}"
+  tags: [step17]

@@ -1,0 +1,44 @@
+apiVersion: kuadrant.io/v1alpha1
+kind: TokenRateLimitPolicy
+metadata:
+  name: llm-token-rlp
+  namespace: llm
+spec:
+  targetRef:
+    group: gateway.networking.k8s.io
+    kind: HTTPRoute
+    name: maas-route
+  limits:
+    free:
+      rates:
+
+        - limit: 50 # 50 tokens per minute for free users (small for testing)
+          window: 1m
+      when:
+        # Tier is selected by X-LLM-Group (values match kuadrant.io/groups in 05_llm-users.yaml).
+        - predicate: request.path == "/v1/chat/completions"
+        - predicate: |
+            'x-llm-group' in request.headers && request.headers['x-llm-group'] == 'free'
+      counters:
+        - expression: auth.identity.userid
+    gold:
+      rates:
+        - limit: 200000 # 200,000 tokens per minute for gold users (small for testing)
+          window: 1m
+      when:
+        - predicate: request.path == "/v1/chat/completions"
+        - predicate: |
+            'x-llm-group' in request.headers && request.headers['x-llm-group'] == 'gold'
+      counters:
+        - expression: auth.identity.userid
+    invalid-tier:
+      rates:
+        - limit: 0 # missing header or value other than free|gold → no quota
+          window: 1m
+      when:
+        - predicate: request.path == "/v1/chat/completions"
+        - predicate: |
+            !('x-llm-group' in request.headers) ||
+            (request.headers['x-llm-group'] != 'free' && request.headers['x-llm-group'] != 'gold')
+      counters:
+        - expression: auth.identity.userid

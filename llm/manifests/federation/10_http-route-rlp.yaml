@@ -1,0 +1,16 @@
+apiVersion: kuadrant.io/v1
+kind: RateLimitPolicy
+metadata:
+  name: maas-route-rlp
+  namespace: llm
+spec:
+  targetRef:
+    group: gateway.networking.k8s.io
+    kind: HTTPRoute
+    name: maas-route
+  defaults:
+    limits:
+      all-requests:
+        rates:
+          - limit: 20
+            window: 10s
