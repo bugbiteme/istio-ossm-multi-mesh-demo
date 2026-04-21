@@ -235,7 +235,7 @@ Output
 
 Create an AuthPolicy for our LLM that allows access with a valid `APIKEY`
 ```bash
-oc apply -f llm/manifests/federation/07_auth-policy.yaml 
+oc apply -f llm/manifests/federation/08_auth-policy.yaml 
 ```
 
 Test with valid APIKEY
@@ -333,6 +333,11 @@ curl -X POST https://$LLM_URI/v1/chat/completions \
     "temperature": 0.2
   }' && echo && echo
 done
+```
+
+TokenRateLimitPolicy
+```bash
+oc apply -f llm/manifests/federation/11_http-route-token-rlp.yaml 
 ```
 
 Token tier for `TokenRateLimitPolicy` is determined by the **`X-LLM-Group`** header (`free` or `gold`), matching the `kuadrant.io/groups` values on the tutorial API key secrets in `llm/manifests/federation/05_llm-users.yaml`. Keep `Authorization: APIKEY my-own-custom-key` as shown; add the tier header next to it.
