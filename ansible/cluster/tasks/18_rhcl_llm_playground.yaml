@@ -1,0 +1,113 @@
+---
+# Step 18: RHCL LLM playground (requires OpenShift GitOps default Argo CD instance)
+
+- name: "[18.1] Wait for default Argo CD instance Reconciled=True (east)"
+  kubernetes.core.k8s_info:
+    context: "{{ ctx_east }}"
+    api_version: argoproj.io/v1beta1
+    kind: ArgoCD
+    name: openshift-gitops
+    namespace: openshift-gitops
+  register: argocd_openshift_gitops_east
+  until: >
+    argocd_openshift_gitops_east.resources | length > 0 and
+    (
+      argocd_openshift_gitops_east.resources[0].status.conditions | default([]) |
+      selectattr('type', 'equalto', 'Reconciled') |
+      map(attribute='status') |
+      first |
+      default('')
+    ) == 'True'
+  retries: 60
+  delay: 15
+  failed_when: >
+    argocd_openshift_gitops_east.resources | length > 0 and
+    (
+      argocd_openshift_gitops_east.resources[0].status.conditions | default([]) |
+      selectattr('type', 'equalto', 'Reconciled') |
+      map(attribute='status') |
+      first |
+      default('')
+    ) == 'False'
+  tags: [step18]
+
+- name: "[18.2] Apply Argo CD Application (llm-playground from upstream manifest)"
+  kubernetes.core.k8s:
+    context: "{{ ctx_east }}"
+    definition: >-
+      {{
+        lookup(
+          'ansible.builtin.url',
+          'https://raw.githubusercontent.com/bugbiteme/llm-playground-manifests/refs/heads/main/gitops/application.yaml'
+        ) | from_yaml
+      }}
+    state: present
+    apply: true
+  tags: [step18]
+
+- name: "[18.3] Wait for Argo CD Application sync status Synced (east)"
+  kubernetes.core.k8s_info:
+    context: "{{ ctx_east }}"
+    api_version: argoproj.io/v1alpha1
+    kind: Application
+    name: llm-playground
+    namespace: openshift-gitops
+  register: argocd_llm_playground_app_east
+  until: >
+    argocd_llm_playground_app_east.resources | length > 0 and
+    (
+      argocd_llm_playground_app_east.resources[0].status.sync.status | default('')
+    ) == 'Synced'
+  retries: 60
+  delay: 15
+  tags: [step18]
+
+- name: "[18.4] Apply PipelineRun (llm-policy-monitor) from upstream manifest"
+  kubernetes.core.k8s:
+    context: "{{ ctx_east }}"
+    definition: >-
+      {{
+        lookup(
+          'ansible.builtin.url',
+          'https://raw.githubusercontent.com/bugbiteme/llm-playground-manifests/refs/heads/main/k8s/pipelinerun-llm-pol-mon.yaml'
+        ) | from_yaml
+      }}
+    state: present
+    apply: true
+  tags: [step18]
+
+- name: "[18.5] Apply PipelineRun (llm-playground) from upstream manifest"
+  kubernetes.core.k8s:
+    context: "{{ ctx_east }}"
+    definition: >-
+      {{
+        lookup(
+          'ansible.builtin.url',
+          'https://raw.githubusercontent.com/bugbiteme/llm-playground-manifests/refs/heads/main/k8s/pipelinerun-llm-playground.yaml'
+        ) | from_yaml
+      }}
+    state: present
+    apply: true
+  tags: [step18]
+
+- name: "[18.6] Wait for Argo CD Application health Healthy (east, 600s)"
+  kubernetes.core.k8s_info:
+    context: "{{ ctx_east }}"
+    api_version: argoproj.io/v1alpha1
+    kind: Application
+    name: llm-playground
+    namespace: openshift-gitops
+  register: argocd_llm_playground_health_east
+  until: >
+    argocd_llm_playground_health_east.resources | length > 0 and
+    (
+      argocd_llm_playground_health_east.resources[0].status.health.status | default('')
+    ) == 'Healthy'
+  retries: 120
+  delay: 5
+  failed_when: >
+    argocd_llm_playground_health_east.resources | length > 0 and
+    (
+      argocd_llm_playground_health_east.resources[0].status.health.status | default('')
+    ) == 'Degraded'
+  tags: [step18]

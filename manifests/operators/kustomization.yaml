@@ -8,3 +8,5 @@ resources:
   - coo.yaml
   - otel.yaml
   - tempo.yaml
+  - gitops-operator.yaml
+  - pipelines-operator.yaml
