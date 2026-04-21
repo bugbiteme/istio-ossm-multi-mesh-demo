@@ -28,13 +28,13 @@ export LLM_API_KEY=<your token>
 ```
 Then create the resource
 ```bash
-envsubst < llm/manifests/federation/06_secret.yaml | oc apply -f -
+envsubst < llm/manifests/federation/07_secret.yaml | oc apply -f -
 ```
 
 `HTTPRoute` — the actual routing rule that ties everything together. It tells the Gateway: "requests arriving at `llm.demo.leonlevy.lol/v1/*` should be forwarded to the maas-backend Service, and rewrite the Host header to `litellm-prod.apps.maas.redhatworkshops.io` before sending". It's also where RHCL hooks in the `AuthPolicy`
 
 ```bash
-oc apply -f llm/manifests/federation/07_http-route.yaml 
+oc apply -f llm/manifests/federation/06_http-route.yaml 
 ```
 
 Create an auth-policy for the top-level API key

@@ -19,7 +19,7 @@ spec:
         - predicate: "auth.identity.userid == 'bob'"
       "general-limit":        # applies to everyone else (no when condition)
         rates:
-        - limit: 5
+        - limit: 2
           window: 10s
         when:
         - predicate: "auth.identity.userid != 'bob'"  # excludes Bob

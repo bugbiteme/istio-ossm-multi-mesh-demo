@@ -9,6 +9,15 @@
     apply: true
   tags: [step16]
 
+- name: "[16.2] Apply Bookinfo API Keys (east)"
+  kubernetes.core.k8s:
+    context: "{{ ctx_east }}"
+    definition: "{{ item }}"
+    state: present
+    apply: true
+  loop: "{{ lookup('file', repo_root ~ '/manifests/bookinfo/app/rhcl/productpage-keys.yaml') | from_yaml_all | list }}"
+  tags: [step16]
+
 # - name: "[16.1] Apply Bookinfo HTTPRoute for RHCL (west)"
 #   kubernetes.core.k8s:
 #     context: "{{ ctx_west }}"
