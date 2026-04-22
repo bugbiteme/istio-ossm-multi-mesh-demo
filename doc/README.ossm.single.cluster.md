@@ -25,22 +25,6 @@ oc apply -f manifests/cluster/east/console-notification.yaml
 
 ---
 
-## 2. Ensure `istioctl` is installed (RHEL bastion host) (Skip if using Dev Spaces)
-
-Download the latest Istio release:
-
-```bash
-curl -L https://istio.io/downloadIstio | ISTIO_VERSION=1.27.5 sh -
-
-# Move istioctl to your PATH
-sudo mv istio-*/bin/istioctl /usr/local/bin/
-
-# Verify
-istioctl version
-
-# Remove download directory
-rm -r ./istio-1.27.5
-```
 
 ---
 
@@ -61,7 +45,6 @@ oc --context="${CTX_EAST}" version
 
 ## 4. Install operators
 
-**Note:** Cert-Manager might already be installed if using RHDP.
 
 ```bash
 oc --context="${CTX_EAST}" apply -k manifests/operators/
@@ -75,7 +58,6 @@ Wait until OSSM and Kiali are ready (PHASE `Succeeded`):
 
 ```bash
 oc --context="${CTX_EAST}" get csv -n openshift-operators -o custom-columns=NAME:.metadata.name,PHASE:.status.phase
-oc --context="${CTX_EAST}" get csv -n cert-manager-operator -o custom-columns=NAME:.metadata.name,PHASE:.status.phase 2>/dev/null || true
 ```
 
 ### 4.2 Enable user workload monitoring
@@ -104,56 +86,6 @@ oc --context="${CTX_EAST}" get pods -n openshift-user-workload-monitoring
 
 ---
 
-## 5. Create the shared root CA
-
-This step runs **once**. The root CA key should be stored in a secrets manager (Vault, AWS Secrets Manager, etc.) after use. Only the cert is distributed to the cluster.
-
-The OpenSSL config is in [`certs/root-ca.conf`](../certs/root-ca.conf). Run from the repo root:
-
-```bash
-cd certs
-openssl genrsa -out root-ca.key 4096
-openssl req -new -key root-ca.key -config root-ca.conf -out root-ca.csr
-openssl x509 -req -days 3650 -signkey root-ca.key \
-  -extensions req_ext -extfile root-ca.conf \
-  -in root-ca.csr -out root-ca.crt
-cd ..
-```
-
-### 5.1 Load the root CA into cert-manager
-
-The root CA is loaded as a `ClusterIssuer` using [`manifests/cert-manager/clusterissuer.yaml`](../manifests/cert-manager/clusterissuer.yaml):
-
-```bash
-oc --context="${CTX_EAST}" create namespace istio-system --dry-run=client -o yaml | \
-  oc --context="${CTX_EAST}" apply -f -
-
-oc --context="${CTX_EAST}" create secret tls root-ca-secret \
-  -n cert-manager \
-  --cert=certs/root-ca.crt \
-  --key=certs/root-ca.key \
-  --dry-run=client -o yaml | oc --context="${CTX_EAST}" apply -f -
-
-oc --context="${CTX_EAST}" apply -f manifests/cert-manager/clusterissuer.yaml
-```
-
-**Note:** The `istio-system` namespace is created at this time as well.
-
-### 5.2 Issue intermediate CA certificate
-
-Apply the intermediate CA manifest to the `istio-system` namespace. cert-manager will issue an intermediate CA signed by the shared root:
-
-```bash
-oc --context="${CTX_EAST}" apply -f manifests/cert-manager/east-intermediate-ca.yaml
-```
-
-Verify the secret is populated before continuing:
-
-```bash
-oc --context="${CTX_EAST}" get secret cacerts -n istio-system
-```
-
-It must show `kubernetes.io/tls` with a non-empty `ca.crt`.
 
 ---
 
@@ -202,13 +134,6 @@ oc --context="${CTX_EAST}" wait --for=condition=Ready istio/default \
   -n istio-system --timeout=300s
 ```
 
-Verify istiod has successfully initialized its CA and propagated the root cert ConfigMap to `istio-system`. Gateway pods will fail to start if the `istio-ca-root-cert` ConfigMap is absent, because the injected sidecar mounts it as a volume:
-
-```bash
-oc --context="${CTX_EAST}" get configmap istio-ca-root-cert -n istio-system
-```
-
-This must exist before continuing. If it is missing, check that the `cacerts` secret was correctly applied.
 
 ### 7.3 Ingress gateway deployment
 

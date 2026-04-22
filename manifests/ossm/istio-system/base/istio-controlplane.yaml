@@ -14,16 +14,16 @@ spec:
       network: placeholder
     meshConfig:
       # only needed for travel-agency demo
-      serviceSettings:
-        - hosts:
-            - cars.travel-agency.svc.cluster.local
-            - flights.travel-agency.svc.cluster.local
-            - hotels.travel-agency.svc.cluster.local
-            - insurances.travel-agency.svc.cluster.local
-            - discounts.travel-agency.svc.cluster.local
-            - mysqldb.travel-agency.svc.cluster.local
-          settings:
-            clusterLocal: true
+      # serviceSettings:
+      #   - hosts:
+      #       - cars.travel-agency.svc.cluster.local
+      #       - flights.travel-agency.svc.cluster.local
+      #       - hotels.travel-agency.svc.cluster.local
+      #       - insurances.travel-agency.svc.cluster.local
+      #       - discounts.travel-agency.svc.cluster.local
+      #       - mysqldb.travel-agency.svc.cluster.local
+      #     settings:
+      #       clusterLocal: true
       discoverySelectors:
         - matchLabels:
             istio-injection: enabled

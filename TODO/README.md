@@ -5,11 +5,9 @@ OSSM
 
 RHCL
 
-- Incorporate travel-agency web portal like in workshop
+- Developer Portal
 - Multi-cloud failover
-- LLM - TokenRateLimitPolicy
-  - hosted LLM
-  - External LLM
 - MCP gateway
 - VM based workloads (OVE)
+- Developer Portal
 
