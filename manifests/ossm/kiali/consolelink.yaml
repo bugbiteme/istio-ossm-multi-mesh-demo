@@ -1,0 +1,11 @@
+apiVersion: console.openshift.io/v1
+kind: ConsoleLink
+metadata:
+  name: kiali
+spec:
+  applicationMenu:
+    imageURL: data:image/png;base64,AAABAAEAEBAAAAEAIABoBAAAFgAAACgAAAAQAAAAIAAAAAEAIAAAAAAAAAQAACMAAAAjAAAAAAAAAAAAAAD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wBEMQFARDEBsEQxAcBEMQHARDEBwEQxAWD///8A////AP///wD///8A////AP///wD///8A////AP///wBEMQGgakoB/4RaAb5EMQFQRDEBQEQxAZBEMQHgRDEB0EQxARD///8A////AN2TAEDdkwDQ3ZMA/92TAP+rcwDWgFcB9t2TAP/dkwD/3ZMAQP///wD///8ARDEBEEQxAbBEMQHQRDEBEN2TADDdkwD/3ZMA/92TAP/dkwD/eFMB/92TAP/dkwD/3ZMA/92TAMD///8A////AP///wBEMQEQRDEB4EQxAYDdkwCw3ZMA/92TAP/dkwD/zIgA67F3AOLdkwD/3ZMA/92TAP/dkwD/3ZMAIP///wD///8A////AEQxAWBEMQHQ3ZMA/92TAP/dkwD/3ZMA/5xpAODHhQDg3ZMA/92TAP/dkwD/3ZMA/92TAED///8A////AP///wBEMQFARDEB/92TAP/dkwD/3ZMA/92TAP+caQDgx4UA4N2TAP/dkwD/3ZMA/92TAP/dkwBA////AP///wD///8ARDEBQEQxAf/dkwCw3ZMA/92TAP/dkwD/zIgA67F3AOLdkwD/3ZMA/92TAP/dkwD/3ZMAIP///wD///8A////AEQxAWBEMQHQ3ZMAMN2TAP/dkwD/3ZMA/92TAP94UwH/3ZMA/92TAP/dkwD/3ZMAwP///wD///8A////AEQxARBEMQHgRDEBgP///wDdkwBA3ZMA0N2TAP/dkwD/q3MA1oBXAfbdkwD/3ZMA/92TAED///8A////AEQxARBEMQGwRDEB0EQxARD///8A////AP///wD///8A////AP///wBEMQGgakoB/4RaAb5EMQFQRDEBQEQxAZBEMQHgRDEB0EQxASD///8A////AP///wD///8A////AP///wD///8A////AEQxAUBEMQGwRDEBwEQxAcBEMQHARDEBYP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A//8AAP//AAD+BwAA/AEAAIAwAAAAOAAAABwAAAAcAAAAHAAAABwAAAA4AACAMAAA/AEAAP4HAAD//wAA//8AAA==
+    section: OpenShift Service Mesh
+  href: https://kiali-istio-system.apps.cluster-pldrx.pldrx.sandbox1098.opentlc.com
+  location: ApplicationMenu
+  text: Kiali Console

@@ -31,18 +31,23 @@
     ) == 'False'
   tags: [step18]
 
+# Fetch upstream YAML to a file, then k8s src= (avoids lookup('url')|from_yaml in k8s definition, which
+# can spike memory and get the controller Python killed on macOS: "Python quit unexpectedly" / dead worker).
+# Block name matches the former single task so --start-at-task still runs download+apply.
 - name: "[18.2] Apply Argo CD Application (llm-playground from upstream manifest)"
-  kubernetes.core.k8s:
-    context: "{{ ctx_east }}"
-    definition: >-
-      {{
-        lookup(
-          'ansible.builtin.url',
-          'https://raw.githubusercontent.com/bugbiteme/llm-playground-manifests/refs/heads/main/gitops/application.yaml'
-        ) | from_yaml
-      }}
-    state: present
-    apply: true
+  block:
+  - name: "Download gitops/application.yaml to controller /tmp"
+    ansible.builtin.get_url:
+      url: https://raw.githubusercontent.com/bugbiteme/llm-playground-manifests/refs/heads/main/gitops/application.yaml
+      dest: /tmp/llm-playground-ansible-step18-app.yaml
+      mode: "0600"
+      force: true
+  - name: "Apply to east cluster (kubernetes.core.k8s)"
+    kubernetes.core.k8s:
+      context: "{{ ctx_east }}"
+      src: /tmp/llm-playground-ansible-step18-app.yaml
+      state: present
+      apply: true
   tags: [step18]
 
 - name: "[18.3] Wait for Argo CD Application sync status Synced (east)"
@@ -63,31 +68,36 @@
   tags: [step18]
 
 - name: "[18.4] Apply PipelineRun (llm-policy-monitor) from upstream manifest"
-  kubernetes.core.k8s:
-    context: "{{ ctx_east }}"
-    definition: >-
-      {{
-        lookup(
-          'ansible.builtin.url',
-          'https://raw.githubusercontent.com/bugbiteme/llm-playground-manifests/refs/heads/main/k8s/pipelinerun-llm-pol-mon.yaml'
-        ) | from_yaml
-      }}
-    state: present
-    apply: true
+  block:
+  - name: "Download pipelinerun-llm-pol-mon.yaml to controller /tmp"
+    ansible.builtin.get_url:
+      url: https://raw.githubusercontent.com/bugbiteme/llm-playground-manifests/refs/heads/main/k8s/pipelinerun-llm-pol-mon.yaml
+      dest: /tmp/llm-playground-ansible-step18-pipelinerun-pol-mon.yaml
+      mode: "0600"
+      force: true
+  # Upstream uses metadata.generateName only (no name). apply: true (SSA) requires a name; use create/merge.
+  - name: "Apply llm-policy-monitor PipelineRun to east cluster"
+    kubernetes.core.k8s:
+      context: "{{ ctx_east }}"
+      src: /tmp/llm-playground-ansible-step18-pipelinerun-pol-mon.yaml
+      state: present
+      apply: false
   tags: [step18]
 
 - name: "[18.5] Apply PipelineRun (llm-playground) from upstream manifest"
-  kubernetes.core.k8s:
-    context: "{{ ctx_east }}"
-    definition: >-
-      {{
-        lookup(
-          'ansible.builtin.url',
-          'https://raw.githubusercontent.com/bugbiteme/llm-playground-manifests/refs/heads/main/k8s/pipelinerun-llm-playground.yaml'
-        ) | from_yaml
-      }}
-    state: present
-    apply: true
+  block:
+  - name: "Download pipelinerun-llm-playground.yaml to controller /tmp"
+    ansible.builtin.get_url:
+      url: https://raw.githubusercontent.com/bugbiteme/llm-playground-manifests/refs/heads/main/k8s/pipelinerun-llm-playground.yaml
+      dest: /tmp/llm-playground-ansible-step18-pipelinerun-playground.yaml
+      mode: "0600"
+      force: true
+  - name: "Apply llm-playground PipelineRun to east cluster"
+    kubernetes.core.k8s:
+      context: "{{ ctx_east }}"
+      src: /tmp/llm-playground-ansible-step18-pipelinerun-playground.yaml
+      state: present
+      apply: true
   tags: [step18]
 
 - name: "[18.6] Wait for Argo CD Application health Healthy (east, 600s)"

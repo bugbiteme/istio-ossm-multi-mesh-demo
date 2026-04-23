@@ -77,6 +77,7 @@ Apply the DNSPolicy:
 ```bash
 oc -n ingress-gateway apply -f rhcl/manifests/dns/dns-pol.yaml
 sh scripts/demo-dns.sh ready "$GATEWAY_URL"
+sh scripts/demo-dns.sh ready "llm.demo.leonlevy.lol"
 sh scripts/demo-dns.sh show  
 ```
 
