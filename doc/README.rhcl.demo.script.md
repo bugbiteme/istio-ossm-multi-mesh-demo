@@ -21,7 +21,7 @@ If the cluster was fully provisioned by the playbook and you want to walk throug
 oc -n llm delete authpolicy maas-auth
 oc -n llm delete httproute maas-route
 oc -n bookinfo delete httproute bookinfo
-oc -n ingress-gateway delete dnspolicy prod-gateway-dnspolicy
+# oc -n ingress-gateway delete dnspolicy prod-gateway-dnspolicy
 ```
 
 ---
