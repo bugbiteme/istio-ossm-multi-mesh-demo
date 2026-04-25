@@ -187,6 +187,7 @@ Once the Route 53 work in [section 5.1](#51-route-53-prerequisites-outside-the-c
    TLSPolicy has been successfully enforced
    ```
 
+
 10. **DNSPolicy**
 
     ```bash

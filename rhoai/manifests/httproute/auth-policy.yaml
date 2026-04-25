@@ -1,0 +1,40 @@
+apiVersion: kuadrant.io/v1
+kind: AuthPolicy
+metadata:
+  name: llm-auth
+  namespace: my-first-model
+spec:
+  targetRef:
+    group: gateway.networking.k8s.io
+    kind: HTTPRoute
+    name: llama-32-3b-instruct-route-rhcl
+  rules:
+    authentication:
+      "api-key-users":
+        apiKey:
+          selector:
+            matchLabels:
+              app: my-first-model
+        credentials:
+          authorizationHeader:
+            prefix: Bearer
+    response:
+      unauthenticated:
+        headers:
+          content-type:
+            value: application/json
+        body:
+          value: '{"message": "unauthorized"}'
+      unauthorized:
+        headers:
+          content-type:
+            value: application/json
+        body:
+          value: '{"message": "unauthorized"}'
+      success:
+        filters:
+          "identity":
+            json:
+              properties:
+                "userid":
+                  selector: auth.identity.metadata.annotations.secret\.kuadrant\.io/user-id

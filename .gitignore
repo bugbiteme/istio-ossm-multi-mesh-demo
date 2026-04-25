@@ -16,6 +16,8 @@ ansible/multi_cluster/env.sh
 
 # Local overrides (never commit secrets); copy from env.sh.example
 rhcl/env.sh
+rhcl/rhaoi.env.sh
+rhcl/*.env.sh
 
 # Terraform
 .terraform/

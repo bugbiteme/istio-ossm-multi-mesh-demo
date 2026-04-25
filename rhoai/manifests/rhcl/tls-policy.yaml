@@ -1,0 +1,14 @@
+apiVersion: kuadrant.io/v1
+kind: TLSPolicy
+metadata:
+  name: openshift-ai-inference-rhcl-tls
+  namespace: openshift-ingress
+spec:
+  targetRef:
+    name: openshift-ai-inference-rhcl
+    group: gateway.networking.k8s.io
+    kind: Gateway
+  issuerRef:
+    group: cert-manager.io
+    kind: ClusterIssuer
+    name: letsencrypt

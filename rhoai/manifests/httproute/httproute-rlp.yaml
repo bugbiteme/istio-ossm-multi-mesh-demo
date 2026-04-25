@@ -1,0 +1,16 @@
+apiVersion: kuadrant.io/v1
+kind: RateLimitPolicy
+metadata:
+  name: llm-route-rlp
+  namespace: my-first-model
+spec:
+  targetRef:
+    group: gateway.networking.k8s.io
+    kind: HTTPRoute
+    name: llama-32-3b-instruct-route-rhcl
+  defaults:
+    limits:
+      all-requests:
+        rates:
+          - limit: 20
+            window: 10s

@@ -1,0 +1,16 @@
+apiVersion: kuadrant.io/v1
+kind: RateLimitPolicy
+metadata:
+  name: openshift-ai-inference-rhcl-rlp
+  namespace: openshift-ingress
+spec:
+  targetRef:
+    group: gateway.networking.k8s.io
+    kind: Gateway
+    name: openshift-ai-inference-rhcl
+  defaults:
+    limits:
+      "low-limit":
+        rates:
+        - limit: 2
+          window: 10s

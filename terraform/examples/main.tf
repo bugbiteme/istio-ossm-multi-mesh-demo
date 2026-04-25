@@ -20,21 +20,36 @@ module "demo_subdomain" {
   }
 }
 
+module "rhoai_subdomain" {
+  source = "../modules/route53-subdomain"
+
+  parent_zone_name = "leonlevy.lol"
+  subdomain        = "rhoai"
+  delegation_ttl   = 300
+
+  comment = "RHOAI environment subdomain"
+
+  tags = {
+    Environment = "rhoai"
+    ManagedBy   = "terraform"
+  }
+}
+
 # -------------------------------------------------------------------
 # Multiple subdomains — just call the module multiple times
 # -------------------------------------------------------------------
-# module "staging_subdomain" {
-#   source = "../modules/route53-subdomain"
+module "rhoai_subdomain" {
+  source = "../modules/route53-subdomain"
 
-#   parent_zone_name = "leonlevy.lol"
-#   subdomain        = "staging"
-#   delegation_ttl   = 300
+  parent_zone_name = "leonlevy.lol"
+  subdomain        = "rhoai"
+  delegation_ttl   = 300
 
-#   tags = {
-#     Environment = "staging"
-#     ManagedBy   = "terraform"
-#   }
-# }
+  tags = {
+    Environment = "rhoai"
+    ManagedBy   = "terraform"
+  }
+}
 
 # module "api_subdomain" {
 #   source = "../modules/route53-subdomain"

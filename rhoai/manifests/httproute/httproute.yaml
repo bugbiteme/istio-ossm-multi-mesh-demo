@@ -1,0 +1,28 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: llama-32-3b-instruct-route-rhcl
+  namespace: my-first-model
+spec:
+  hostnames:
+  - llama-32-3b-instruct.rhoai.leonlevy.lol
+  parentRefs:
+  - group: gateway.networking.k8s.io
+    kind: Gateway
+    name: openshift-ai-inference-rhcl
+    namespace: openshift-ingress
+  rules:
+  - backendRefs:
+    - group: ""
+      kind: Service
+      name: llama-32-3b-instruct-predictor
+      port: 80
+      weight: 1
+    matches:
+    - headers:
+      - name: X-Model
+        type: Exact
+        value: llama-32-3b-instruct
+      path:
+        type: PathPrefix
+        value: /

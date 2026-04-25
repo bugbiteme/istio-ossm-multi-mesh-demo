@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: llm-api-key-user1
+  namespace: kuadrant-system
+  labels:
+    app: my-first-model
+  annotations:
+    secret.kuadrant.io/user-id: user1
+type: Opaque
+stringData:
+  api_key: user1-api-key
