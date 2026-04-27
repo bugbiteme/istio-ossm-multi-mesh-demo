@@ -420,6 +420,6 @@ curl https://llama-32-3b-instruct.rhoai.leonlevy.lol/v1/chat/completions \
   -d '{
     "model": "llama-32-3b-instruct",
     "messages": [{"role": "user", "content": "What is an AI Gateway?"}],
-    "max_tokens": 100
+    "max_tokens": 50
   }' 
 ```

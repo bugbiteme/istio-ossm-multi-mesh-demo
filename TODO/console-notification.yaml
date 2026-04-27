@@ -3,11 +3,21 @@ kind: ConsoleNotification
 metadata:
   name: cluster-identity
 spec:
-  text: "Cluster East — Production | EU-West-1"
+  text: "RHOAI Cluster — POC | EU-West-1"
   location: BannerTop
   color: "#FFFFFF"
-  # RED
-  backgroundColor: "#EE0000"
+  # "#EE0000" RED
+  backgroundColor: "#0000FF"
   # #008000 — web/HTML green
   # #3E8635 — Red Hat success green
+  # #FFFF00 — web/HTML yellow
+  # - blue: #0000FF
+  # - purple: #800080
+  # - orange: #FFA500
+  # - pink: #FFC0CB
+  # - brown: #A52A2A
+  # - gray: #808080
+  # - black: #000000
+  # - white: #FFFFFF
+  # - red: #FF0000
   

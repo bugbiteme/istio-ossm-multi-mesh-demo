@@ -404,3 +404,34 @@ sudo dscacheutil -flushcache && sudo killall -HUP mDNSResponder
 ```bash
 sudo resolvectl flush-caches
 ```
+
+Make sure dnsrecords, tlspol, and dnspol are showing the following status
+
+```bash
+ oc -n ingress-gateway get dnsrecords.kuadrant.io,dnspolicy,tlspolicy -o wide
+```
+
+Expected output
+```
+NAME                                      READY   HEALTHY   ROOT HOST             OWNER ID   ZONE DOMAIN         ZONE ID
+dnsrecord.kuadrant.io/prod-gateway-api    True              *.demo.leonlevy.lol   1lm652z6   demo.leonlevy.lol   /hostedzone/Z04750902KLRBOAQR4XLK
+dnsrecord.kuadrant.io/prod-gateway-http   True              *.demo.leonlevy.lol   8vg4cgpp   demo.leonlevy.lol   /hostedzone/Z04750902KLRBOAQR4XLK
+
+NAME                                           ACCEPTED   ENFORCED   SUBRESOURCESHEALTHY   TARGETREFKIND   TARGETREFNAME   TARGETSECTION   AGE
+dnspolicy.kuadrant.io/prod-gateway-dnspolicy   True       True                             Gateway         prod-gateway                    31m
+
+NAME                                     ACCEPTED   ENFORCED   TARGETREFKIND   TARGETREFNAME   TARGETSECTION   AGE
+tlspolicy.kuadrant.io/prod-gateway-tls   True       True       Gateway         prod-gateway                    34m
+```
+
+ensure hostedzone is in alignment with Route 53
+
+```bash
+aws route53 list-hosted-zones-by-name --dns-name "demo.leonlevy.lol" \
+    --query "HostedZones[0].Id" --output text
+```
+
+output
+```
+/hostedzone/Z04750902KLRBOAQR4XLK
+```

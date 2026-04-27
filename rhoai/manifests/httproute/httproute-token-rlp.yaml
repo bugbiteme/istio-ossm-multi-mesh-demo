@@ -7,7 +7,7 @@ spec:
   targetRef:
     group: gateway.networking.k8s.io
     kind: HTTPRoute
-    name: llama-32-3b-instruct-route-rhcl
+    name: llm-route
   limits:
     free:
       rates:
@@ -24,7 +24,7 @@ spec:
     gold:
       rates:
         - limit: 200000 # 200,000 tokens per minute for gold users (small for testing)
-          window: 1m
+          window: 12h
       when:
         - predicate: request.path == "/v1/chat/completions"
         - predicate: |

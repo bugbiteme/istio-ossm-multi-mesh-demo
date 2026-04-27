@@ -7,10 +7,10 @@ spec:
   targetRef:
     group: gateway.networking.k8s.io
     kind: HTTPRoute
-    name: llama-32-3b-instruct-route-rhcl
+    name: llm-route
   defaults:
     limits:
-      all-requests:
+      route-rate-limit:
         rates:
           - limit: 20
             window: 10s

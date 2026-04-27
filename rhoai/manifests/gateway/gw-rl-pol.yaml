@@ -10,7 +10,7 @@ spec:
     name: openshift-ai-inference-rhcl
   defaults:
     limits:
-      "low-limit":
+      gw-low-limit:
         rates:
         - limit: 2
           window: 10s
