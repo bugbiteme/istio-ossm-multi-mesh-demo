@@ -20,49 +20,49 @@ module "demo_subdomain" {
   }
 }
 
-module "rhoai_subdomain" {
-  source = "../modules/route53-subdomain"
+# module "rhoai_subdomain" {
+#   source = "../modules/route53-subdomain"
 
-  parent_zone_name = "leonlevy.lol"
-  subdomain        = "rhoai"
-  delegation_ttl   = 300
+#   parent_zone_name = "leonlevy.lol"
+#   subdomain        = "rhoai"
+#   delegation_ttl   = 300
 
-  comment = "RHOAI environment subdomain"
+#   comment = "RHOAI environment subdomain"
 
-  tags = {
-    Environment = "rhoai"
-    ManagedBy   = "terraform"
-  }
-}
+#   tags = {
+#     Environment = "rhoai"
+#     ManagedBy   = "terraform"
+#   }
+# }
 
 # -------------------------------------------------------------------
 # Multiple subdomains — just call the module multiple times
 # -------------------------------------------------------------------
-module "rhoai_subdomain" {
-  source = "../modules/route53-subdomain"
-
-  parent_zone_name = "leonlevy.lol"
-  subdomain        = "rhoai"
-  delegation_ttl   = 300
-
-  tags = {
-    Environment = "rhoai"
-    ManagedBy   = "terraform"
-  }
-}
-
-# module "api_subdomain" {
+# module "rhoai_subdomain" {
 #   source = "../modules/route53-subdomain"
 
 #   parent_zone_name = "leonlevy.lol"
-#   subdomain        = "api"
-#   delegation_ttl   = 60 # lower TTL for a frequently-changing API zone
+#   subdomain        = "rhoai"
+#   delegation_ttl   = 300
 
 #   tags = {
-#     Environment = "production"
+#     Environment = "rhoai"
 #     ManagedBy   = "terraform"
 #   }
 # }
+
+module "pipeline_subdomain" {
+  source = "../modules/route53-subdomain"
+
+  parent_zone_name = "leonlevy.lol"
+  subdomain        = "pipeline"
+  delegation_ttl   = 60 # lower TTL for a frequently-changing API zone
+
+  tags = {
+    Environment = "production"
+    ManagedBy   = "terraform"
+  }
+}
 
 # # -------------------------------------------------------------------
 # # Outputs — useful to hand off zone IDs to other Terraform stacks
@@ -75,10 +75,10 @@ output "demo_name_servers" {
   value = module.demo_subdomain.name_servers
 }
 
-# output "staging_zone_id" {
-#   value = module.staging_subdomain.zone_id
+# output "rhoai_zone_id" {
+#   value = module.rhoai_subdomain.zone_id
 # }
 
-# output "api_zone_id" {
-#   value = module.api_subdomain.zone_id
-# }
+output "pipeline_zone_id" {
+  value = module.pipeline_subdomain.zone_id
+}
