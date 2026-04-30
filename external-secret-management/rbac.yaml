@@ -1,0 +1,24 @@
+# rbac.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: eso-secret-reader
+  namespace: secret-store
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: eso-secret-reader
+  namespace: secret-store
+subjects:
+  - kind: ServiceAccount
+    name: eso-reader
+    namespace: secret-store
+roleRef:
+  kind: Role
+  name: eso-secret-reader
+  apiGroup: rbac.authorization.k8s.io

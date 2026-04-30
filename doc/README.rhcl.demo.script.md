@@ -424,6 +424,8 @@ NAME                                     ACCEPTED   ENFORCED   TARGETREFKIND   T
 tlspolicy.kuadrant.io/prod-gateway-tls   True       True       Gateway         prod-gateway                    34m
 ```
 
+oc get dnsrecords.kuadrant.io -n ingress-gateway prod-gateway-api -o jsonpath='{.status.conditions}' | jq 
+
 ensure hostedzone is in alignment with Route 53
 
 ```bash
