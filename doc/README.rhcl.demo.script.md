@@ -28,7 +28,7 @@ oc -n bookinfo delete httproute bookinfo
 
 ## Bookinfo walkthrough
 
-Run `oc` commands from the **repository root** unless your shell is already there. Examples use the demo hostname **`bookinfo.demo.leonlevy.lol`** and zone **`demo.leonlevy.lol`**; substitute your own DNS names where they differ.
+Run `oc` commands from the **repository root** unless your shell is already there. Examples use the demo hostname `**bookinfo.demo.leonlevy.lol`** and zone `**demo.leonlevy.lol**`; substitute your own DNS names where they differ.
 
 ### 1. HTTPRoute (before DNS)
 
@@ -193,6 +193,7 @@ for i in {1..5}; do
   curl -k -w "\n%{http_code}\n" "https://${GATEWAY_URL}/api/v1/products/${i}/ratings" -H 'Authorization: APIKEY IAMALICE'
 done
 ```
+
 ---
 
 ## LLM walkthrough
@@ -227,6 +228,7 @@ curl -X POST https://$LLM_URI/v1/chat/completions \
 Even though we have a valid APIKEY the `deny-all` gateway policy is blocking requests to our LLM
 
 Output
+
 ```json
 {
   "error": "Forbidden",
@@ -235,6 +237,7 @@ Output
 ```
 
 Create an AuthPolicy for our LLM that allows access with a valid `APIKEY`
+
 ```bash
 oc apply -f llm/manifests/federation/08_auth-policy.yaml 
 ```
@@ -254,6 +257,7 @@ curl -X POST https://$LLM_URI/v1/chat/completions \
 ```
 
 Output
+
 ```json
 {
   "id": "chatcmpl-ed2f40bda0044d6e959df26e46d33467",
@@ -293,6 +297,7 @@ curl -X POST https://$LLM_URI/v1/chat/completions \
 ```
 
 Output
+
 ```json
 {
   "message": "unauthorized"
@@ -317,10 +322,13 @@ done
 ```
 
 Create a RateLimitPolicy for the HTTPRoute of 20req/10sec
+
 ```bash
 oc apply -f llm/manifests/federation/10_http-route-rlp.yaml 
 ```
+
 Test it
+
 ```bash
 for i in {1..5}
 do
@@ -337,11 +345,12 @@ done
 ```
 
 TokenRateLimitPolicy
+
 ```bash
 oc apply -f llm/manifests/federation/11_http-route-token-rlp.yaml 
 ```
 
-Token tier for `TokenRateLimitPolicy` is determined by the **`X-LLM-Group`** header (`free` or `gold`), matching the `kuadrant.io/groups` values on the tutorial API key secrets in `llm/manifests/federation/05_llm-users.yaml`. Keep `Authorization: APIKEY my-own-custom-key` as shown; add the tier header next to it.
+Token tier for `TokenRateLimitPolicy` is determined by the `**X-LLM-Group**` header (`free` or `gold`), matching the `kuadrant.io/groups` values on the tutorial API key secrets in `llm/manifests/federation/05_llm-users.yaml`. Keep `Authorization: APIKEY my-own-custom-key` as shown; add the tier header next to it.
 
 ```bash
 # Simulate a free-tier caller (50 tokens/minute budget in 11_http-route-token-rlp.yaml)
@@ -371,8 +380,6 @@ curl -X POST https://$LLM_URI/v1/chat/completions \
   }' && echo && echo
 ```
 
-
-
 ### Cleanup Policies
 
 To remove everything applied in steps **1–6** (reverse dependency order: HTTPRoute policies and route, then gateway policies, then DNS):
@@ -395,6 +402,7 @@ If a resource was already deleted or never applied, `oc delete` returns an error
 Flush the cache to prevent lingering DNS artifacts on your system
 
 # macOS
+
 ```bash
 sudo dscacheutil -flushcache && sudo killall -HUP mDNSResponder
 ```
@@ -412,6 +420,7 @@ Make sure dnsrecords, tlspol, and dnspol are showing the following status
 ```
 
 Expected output
+
 ```
 NAME                                      READY   HEALTHY   ROOT HOST             OWNER ID   ZONE DOMAIN         ZONE ID
 dnsrecord.kuadrant.io/prod-gateway-api    True              *.demo.leonlevy.lol   1lm652z6   demo.leonlevy.lol   /hostedzone/Z04750902KLRBOAQR4XLK
@@ -434,6 +443,8 @@ aws route53 list-hosted-zones-by-name --dns-name "demo.leonlevy.lol" \
 ```
 
 output
+
 ```
 /hostedzone/Z04750902KLRBOAQR4XLK
 ```
+

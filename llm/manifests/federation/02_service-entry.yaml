@@ -5,7 +5,7 @@ metadata:
   namespace: llm
 spec:
   hosts:
-  - litellm-prod.apps.maas.redhatworkshops.io
+  - maas-rhdp.apps.maas.redhatworkshops.io
   ports:
   - number: 443
     name: https

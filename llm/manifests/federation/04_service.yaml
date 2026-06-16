@@ -5,7 +5,7 @@ metadata:
   namespace: llm
 spec:
   type: ExternalName
-  externalName: litellm-prod.apps.maas.redhatworkshops.io
+  externalName: maas-rhdp.apps.maas.redhatworkshops.io
   ports:
   - port: 443
     name: https

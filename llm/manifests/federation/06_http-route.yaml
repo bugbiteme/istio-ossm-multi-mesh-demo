@@ -19,7 +19,7 @@ spec:
     filters:
     - type: URLRewrite
       urlRewrite:
-        hostname: litellm-prod.apps.maas.redhatworkshops.io
+        hostname: maas-rhdp.apps.maas.redhatworkshops.io 
     backendRefs:
     - name: maas-backend
       port: 443

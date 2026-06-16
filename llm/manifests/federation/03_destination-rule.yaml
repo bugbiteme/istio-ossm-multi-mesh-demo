@@ -4,7 +4,7 @@ metadata:
   name: maas-external-tls
   namespace: llm
 spec:
-  host: litellm-prod.apps.maas.redhatworkshops.io
+  host: maas-rhdp.apps.maas.redhatworkshops.io
   trafficPolicy:
     tls:
       mode: SIMPLE
