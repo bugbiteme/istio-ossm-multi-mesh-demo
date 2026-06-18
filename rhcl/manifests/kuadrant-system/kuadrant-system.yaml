@@ -14,3 +14,7 @@ metadata:
 spec:
   observability:
     enable: true
+  components:
+    developerPortal:
+      enabled: true
+
